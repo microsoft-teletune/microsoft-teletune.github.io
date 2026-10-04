@@ -76,10 +76,13 @@ img { max-width: 100%; }
 .hero .ms-stripe { margin: 0 auto 22px; }
 .hero h1 { font: 700 clamp(30px, 5vw, 48px)/1.12 var(--font-display); margin: 0 0 10px; }
 .hero h1 .name { color: var(--accent); }
+.hero h1 .title-logo { height: 0.78em; width: auto; vertical-align: -0.04em; margin-right: 0.22em; }
 .hero .sub { font-size: clamp(18px, 2.4vw, 24px); color: var(--ink-2); font-weight: 400; margin: 0 0 24px; }
 .authors { font-size: 17px; margin: 0 0 6px; }
 .authors span { white-space: nowrap; margin-right: 14px; display: inline-block; }
 .authors sup, .affils sup { color: var(--ink-3); font-size: 11px; margin-left: 1px; }
+.authors a { color: inherit; }
+.authors a:hover { color: var(--accent-ink); }
 .affils { color: var(--ink-2); font-size: 15px; margin: 0 0 4px; }
 .affils span { margin-right: 16px; white-space: nowrap; display: inline-block; }
 .contact, .pubdate { color: var(--ink-3); font-size: 14px; margin: 0 0 4px; }
@@ -87,7 +90,10 @@ img { max-width: 100%; }
 .btn { display: inline-flex; align-items: center; gap: 8px; padding: 8px 18px; border-radius: 4px; background: var(--accent); color: #fff; font-weight: 600; font-size: 15px; text-decoration: none !important; border: 1px solid transparent; }
 :root[data-theme="dark"] .btn:not(.disabled) { color: #0b1a24; }
 .btn:hover { filter: brightness(1.08); }
-.btn.disabled { background: transparent; color: var(--ink-3); border-color: var(--line); cursor: default; }
+.btn.disabled { background: var(--line); color: var(--ink-3); cursor: not-allowed; position: relative; }
+.btn.disabled:hover { filter: none; }
+.btn[data-tip]::after { content: attr(data-tip); position: absolute; left: 50%; bottom: calc(100% + 8px); transform: translateX(-50%); white-space: nowrap; padding: 5px 10px; border-radius: 4px; background: var(--ink); color: var(--bg); font-size: 13px; font-weight: 500; opacity: 0; pointer-events: none; transition: opacity .15s; }
+.btn[data-tip]:hover::after, .btn[data-tip]:focus-visible::after { opacity: 1; }
 .btn svg { width: 17px; height: 17px; }
 .hero-teaser { display: none; }
 
@@ -306,7 +312,7 @@ body[data-template="showcase"] .hero .authors { color: #fff; }
 body[data-template="showcase"] .hero .affils, body[data-template="showcase"] .hero .contact { color: #B8B8B8; }
 body[data-template="showcase"] .hero a { color: #6CCBFF; }
 body[data-template="showcase"] .hero .btn { background: #fff; color: #1B1B1B; }
-body[data-template="showcase"] .hero .btn.disabled { background: transparent; color: #9A9A9A; border-color: #444; }
+body[data-template="showcase"] .hero .btn.disabled { background: #333; color: #9A9A9A; border-color: #444; }
 body[data-template="showcase"] section:nth-of-type(odd) { background: var(--band); }
 body[data-template="showcase"] section { padding: 64px 0; }
 body[data-template="showcase"] h2 { font-size: 32px; }
@@ -460,21 +466,21 @@ body[data-template="compact"] .tile .num { font-size: 30px; }
   <div class="wrap">
     <div class="hero-grid">
       <div class="hero-text">
-        <h1><span class="name">TeleTune</span>: Evolving Agent Skills <br>From Offline Telemetry</h1>
+        <h1><svg class="title-logo" viewBox="0 0 23 23" aria-hidden="true"><path fill="#f25022" d="M1 1h10v10H1z"/><path fill="#7fba00" d="M12 1h10v10H12z"/><path fill="#00a4ef" d="M1 12h10v10H1z"/><path fill="#ffb900" d="M12 12h10v10H12z"/></svg><span class="name">TeleTune</span>: Evolving Agent Skills <br>From Offline Telemetry</h1>
         
         <div class="hero-meta">
           <div>
             <span class="meta-label" style="display:none">Authors</span>
             <div class="authors">
-              <span>Justin Chih-Yao Chen<sup>1</sup></span>
-              <span>Elias Stengel-Eskin<sup>3</sup></span>
+              <span><a href="https://dinobby.github.io/" target="_blank" rel="noopener">Justin Chih-Yao Chen</a><sup>1</sup></span>
+              <span><a href="https://esteng.github.io/" target="_blank" rel="noopener">Elias Stengel-Eskin</a><sup>3</sup></span>
               <span>Yan Chen<sup>2</sup></span>
-              <span>Pol Llado<sup>2</sup></span>
-              <span>Scott Counts<sup>2</sup></span>
-              <span>Mohit Bansal<sup>1</sup></span>
-              <span>Benjamin Van Durme<sup>2</sup></span>
-              <span>Harsh Jhamtani<sup>2</sup></span>
-              <span>Gaurav Verma<sup>2</sup></span>
+              <span><a href="https://www.linkedin.com/in/pol-llado-27372b24/" target="_blank" rel="noopener">Pol Llado</a><sup>2</sup></span>
+              <span><a href="https://www.microsoft.com/en-us/research/people/counts/" target="_blank" rel="noopener">Scott Counts</a><sup>2</sup></span>
+              <span><a href="https://www.cs.unc.edu/~mbansal/" target="_blank" rel="noopener">Mohit Bansal</a><sup>1</sup></span>
+              <span><a href="https://www.cs.jhu.edu/~vandurme/" target="_blank" rel="noopener">Benjamin Van Durme</a><sup>2</sup></span>
+              <span><a href="https://sites.google.com/view/harshjhamtani/home" target="_blank" rel="noopener">Harsh Jhamtani</a><sup>2</sup></span>
+              <span><a href="https://gaurav22verma.github.io/" target="_blank" rel="noopener">Gaurav Verma</a><sup>2</sup></span>
             </div>
           </div>
           <div>
@@ -487,8 +493,8 @@ body[data-template="compact"] .tile .num { font-size: 30px; }
           <a class="btn" href="static/teletune.pdf"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><path d="M14 2v6h6"></path><path d="M8 13h8M8 17h5"></path></svg>Paper</a>
           <!-- TODO: replace "#" with the arXiv abstract URL -->
           <a class="btn" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4h6a4 4 0 0 1 4 4v13a3 3 0 0 0-3-3H2z"></path><path d="M22 4h-6a4 4 0 0 0-4 4v13a3 3 0 0 1 3-3h7z"></path></svg>arXiv</a>
-          <!-- TODO: replace "#" with the code repository URL -->
-          <a class="btn" href="#"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5a12 12 0 0 0-3.8 23.4c.6.1.8-.3.8-.6v-2c-3.3.7-4-1.6-4-1.6-.6-1.4-1.4-1.8-1.4-1.8-1.1-.7.1-.7.1-.7 1.2.1 1.9 1.2 1.9 1.2 1.1 1.9 2.9 1.3 3.6 1 .1-.8.4-1.3.8-1.6-2.7-.3-5.5-1.3-5.5-5.9 0-1.3.5-2.4 1.2-3.2-.1-.3-.5-1.5.1-3.2 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0C17.3 4.6 18.3 5 18.3 5c.7 1.7.2 2.9.1 3.2.8.8 1.2 1.9 1.2 3.2 0 4.6-2.8 5.6-5.5 5.9.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6A12 12 0 0 0 12 .5z"></path></svg>Code</a>
+          <!-- TODO: when the code is out, turn this back into <a class="btn" href="REPO_URL"> -->
+          <span class="btn disabled" data-tip="Code will be released soon" aria-disabled="true" tabindex="0"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5a12 12 0 0 0-3.8 23.4c.6.1.8-.3.8-.6v-2c-3.3.7-4-1.6-4-1.6-.6-1.4-1.4-1.8-1.4-1.8-1.1-.7.1-.7.1-.7 1.2.1 1.9 1.2 1.9 1.2 1.1 1.9 2.9 1.3 3.6 1 .1-.8.4-1.3.8-1.6-2.7-.3-5.5-1.3-5.5-5.9 0-1.3.5-2.4 1.2-3.2-.1-.3-.5-1.5.1-3.2 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0C17.3 4.6 18.3 5 18.3 5c.7 1.7.2 2.9.1 3.2.8.8 1.2 1.9 1.2 3.2 0 4.6-2.8 5.6-5.5 5.9.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6A12 12 0 0 0 12 .5z"></path></svg>Code</span>
         </div>
       </div>
       
