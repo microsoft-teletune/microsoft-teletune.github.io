@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <style>
+    .ink { stroke: #1B1B1B; }
+    @media (prefers-color-scheme: dark) { .ink { stroke: #FFFFFF; } }
+  </style>
+  <!-- three tracks, evenly spaced 150 apart, 40 wide with round caps; each stops 110 from its
+       knob's center (68 knob edge + 22 clear gap + 20 cap), leaving a transparent gap on both sides -->
+  <g fill="none" stroke-linecap="round" stroke-width="40" class="ink">
+    <path d="M106 40V240M106 460V472"/>
+    <path d="M256 40V146M256 366V472"/>
+    <path d="M406 40V52M406 272V472"/>
+  </g>
+  <!-- knobs step from low to high, in Microsoft's red, blue, yellow; outer radius 58 + 20/2 = 68 -->
+  <g stroke-width="20" class="ink">
+    <circle cx="106" cy="350" r="58" fill="#F25022"/>
+    <circle cx="256" cy="256" r="58" fill="#00A4EF"/>
+    <circle cx="406" cy="162" r="58" fill="#FFB900"/>
+  </g>
+</svg>

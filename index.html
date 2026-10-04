@@ -1,0 +1,1354 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TeleTune</title>
+<meta name="description" content="TeleTune: Evolving Agent Skills From Offline Telemetry. We learn a textual skill library for computer-use agents from logs that record no task goals, cannot be replayed, and may interleave several tasks.">
+<meta property="og:title" content="TeleTune: Evolving Agent Skills From Offline Telemetry">
+<meta property="og:description" content="Learning reusable agent skills from offline user telemetry, without task goals or a live environment during optimization.">
+<meta property="og:image" content="static/images/fig1.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="static/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="static/favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="static/apple-touch-icon.png">
+<style>
+/* Selawik is Microsoft's open-source (OFL) metric-compatible fallback for Segoe UI. */
+@font-face { font-family: Selawik; src: url(static/fonts/selawksl.woff2) format("woff2"); font-weight: 300; font-display: swap; }
+@font-face { font-family: Selawik; src: url(static/fonts/selawk.woff2) format("woff2"); font-weight: 400; font-display: swap; }
+@font-face { font-family: Selawik; src: url(static/fonts/selawksb.woff2) format("woff2"); font-weight: 600; font-display: swap; }
+@font-face { font-family: Selawik; src: url(static/fonts/selawkb.woff2) format("woff2"); font-weight: 700; font-display: swap; }
+
+:root {
+  --font: "Segoe UI Variable Text", "Segoe UI", Selawik, system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+  --font-display: "Segoe UI Variable Display", "Segoe UI", Selawik, system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+  --mono: Consolas, "Cascadia Mono", "SF Mono", Menlo, ui-monospace, monospace;
+  --ms-red: #F25022; --ms-green: #7FBA00; --ms-blue: #00A4EF; --ms-yellow: #FFB900;
+  --red-ink: #C43E1C; --green-ink: #107C10; --blue-ink: #0067B8; --yellow-ink: #8A6100;
+  --accent: #0078D4; --accent-soft: #E6F2FB; --accent-ink: #0067B8;
+  --bg: #ffffff; --surface: #ffffff; --surface-2: #F5F5F5; --band: #F7F7F7;
+  --ink: #1B1B1B; --ink-2: #4A4A4A; --ink-3: #6E6E6E;
+  --line: #E1E1E1; --grid: #EDEDED;
+  --base-0: #D2D2D2; --base-1: #ADADAD; --base-2: #858585; --base-3: #555555;
+  --good: #107C10; --bad: #D83B01;
+  --wf-tint: #FFF8E5; --sk-tint: #EAF4FB; --code-bg: #F7F7F7;
+  --shadow: 0 1.6px 3.6px rgba(0,0,0,.08), 0 .3px .9px rgba(0,0,0,.06);
+  --radius: 8px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --red-ink: #FF8A65; --green-ink: #8FD17A; --blue-ink: #6CCBFF; --yellow-ink: #FFCE4D;
+    --accent: #4CC2FF; --accent-soft: #0D2B40; --accent-ink: #6CCBFF;
+    --bg: #141414; --surface: #1E1E1E; --surface-2: #272727; --band: #191919;
+    --ink: #F3F3F3; --ink-2: #C8C8C8; --ink-3: #9A9A9A; --line: #383838; --grid: #2B2B2B;
+    --base-0: #4A4A4A; --base-1: #6E6E6E; --base-2: #999999; --base-3: #C6C6C6;
+    --good: #6CCB5F; --bad: #FF7A45; --wf-tint: #29230F; --sk-tint: #122431; --code-bg: #1A1A1A; --shadow: none;
+  }
+}
+:root[data-theme="dark"] {
+  --red-ink: #FF8A65; --green-ink: #8FD17A; --blue-ink: #6CCBFF; --yellow-ink: #FFCE4D;
+  --accent: #4CC2FF; --accent-soft: #0D2B40; --accent-ink: #6CCBFF;
+  --bg: #141414; --surface: #1E1E1E; --surface-2: #272727; --band: #191919;
+  --ink: #F3F3F3; --ink-2: #C8C8C8; --ink-3: #9A9A9A; --line: #383838; --grid: #2B2B2B;
+  --base-0: #4A4A4A; --base-1: #6E6E6E; --base-2: #999999; --base-3: #C6C6C6;
+  --good: #6CCB5F; --bad: #FF7A45; --wf-tint: #29230F; --sk-tint: #122431; --code-bg: #1A1A1A; --shadow: none;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 17px/1.62 var(--font); -webkit-font-smoothing: antialiased; }
+a { color: var(--accent-ink); text-decoration: none; }
+a:hover { text-decoration: underline; }
+.sc { font-variant: small-caps; font-weight: 600; }
+img { max-width: 100%; }
+.wrap { max-width: 1040px; margin: 0 auto; padding: 0 16px; }
+.col { max-width: 760px; margin-left: auto; margin-right: auto; }
+
+/* four-color stripe */
+.ms-stripe { display: flex; height: 4px; width: 96px; }
+.ms-stripe span { flex: 1; }
+.ms-stripe span:nth-child(1) { background: var(--ms-red); }
+.ms-stripe span:nth-child(2) { background: var(--ms-green); }
+.ms-stripe span:nth-child(3) { background: var(--ms-blue); }
+.ms-stripe span:nth-child(4) { background: var(--ms-yellow); }
+
+/* ---------- hero ---------- */
+.hero { padding: 40px 0 0; }
+.hero .ms-stripe { margin: 0 auto 22px; }
+.hero h1 { font: 700 clamp(30px, 5vw, 48px)/1.12 var(--font-display); margin: 0 0 10px; }
+.hero h1 .name { color: var(--accent); }
+.hero .sub { font-size: clamp(18px, 2.4vw, 24px); color: var(--ink-2); font-weight: 400; margin: 0 0 24px; }
+.authors { font-size: 17px; margin: 0 0 6px; }
+.authors span { white-space: nowrap; margin-right: 14px; display: inline-block; }
+.authors sup, .affils sup { color: var(--ink-3); font-size: 11px; margin-left: 1px; }
+.affils { color: var(--ink-2); font-size: 15px; margin: 0 0 4px; }
+.affils span { margin-right: 16px; white-space: nowrap; display: inline-block; }
+.contact, .pubdate { color: var(--ink-3); font-size: 14px; margin: 0 0 4px; }
+.buttons { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 22px; }
+.btn { display: inline-flex; align-items: center; gap: 8px; padding: 8px 18px; border-radius: 4px; background: var(--accent); color: #fff; font-weight: 600; font-size: 15px; text-decoration: none !important; border: 1px solid transparent; }
+:root[data-theme="dark"] .btn:not(.disabled) { color: #0b1a24; }
+.btn:hover { filter: brightness(1.08); }
+.btn.disabled { background: transparent; color: var(--ink-3); border-color: var(--line); cursor: default; }
+.btn svg { width: 17px; height: 17px; }
+.hero-teaser { display: none; }
+
+/* ---------- sections ---------- */
+section { padding: 48px 0; }
+h2 { font: 600 28px/1.25 var(--font-display); margin: 0 0 14px; }
+h3 { font: 600 20px/1.3 var(--font); margin: 34px 0 10px; }
+p { margin: 0 0 14px; color: var(--ink-2); }
+p strong, li strong { color: var(--ink); }
+.lead { font-size: 19px; color: var(--ink); font-weight: 400; }
+.kicker { color: var(--accent-ink); font-weight: 600; font-size: 14px; margin-bottom: 6px; }
+.split-viz { margin-top: 20px; }
+
+.figure { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; margin: 22px 0 8px; }
+.figure img { width: 100%; height: auto; display: block; }
+.caption { font-size: 14.5px; color: var(--ink-3); margin: 8px 2px 0; line-height: 1.55; }
+.caption b { color: var(--ink-2); }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow); }
+
+/* tiles */
+.tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+.tile { background: var(--surface); border: 1px solid var(--line); border-top: 4px solid var(--c); border-radius: var(--radius); padding: 16px 18px; box-shadow: var(--shadow); }
+.tile:nth-child(1) { --c: var(--ms-red); --ci: var(--red-ink); }
+.tile:nth-child(2) { --c: var(--ms-green); --ci: var(--green-ink); }
+.tile:nth-child(3) { --c: var(--ms-blue); --ci: var(--blue-ink); }
+.tile:nth-child(4) { --c: var(--ms-yellow); --ci: var(--yellow-ink); }
+.tile .num { font: 700 36px/1.1 var(--font-display); font-variant-numeric: tabular-nums; }
+.tile .num .u { font-size: 20px; font-weight: 600; margin-left: 1px; }
+.tile .delta { margin: 6px 0 6px; font-size: 14px; font-weight: 600; color: var(--ci); }
+.tile .lbl { font-size: 14px; color: var(--ink-2); line-height: 1.45; margin: 0; }
+@media (max-width: 820px) { .tiles { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 420px) { .tiles { grid-template-columns: 1fr; } }
+
+/* challenges + loop */
+.cards3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 18px; }
+.cards3 .card h4 { margin: 0 0 6px; font-size: 17px; font-weight: 600; display: flex; align-items: center; gap: 9px; }
+.cards3 .card p { font-size: 15px; margin: 0; }
+.sq { width: 12px; height: 12px; flex: none; display: inline-block; }
+@media (max-width: 760px) { .cards3 { grid-template-columns: 1fr; } }
+
+/* teacher forcing demo */
+.tf-grid { display: grid; grid-template-columns: 130px repeat(5, 1fr); gap: 10px; align-items: center; }
+.tf-row-label { font-size: 14px; color: var(--ink-2); }
+.tf-cell { height: 44px; border-radius: 4px; border: 1.5px solid var(--line); display: grid; place-items: center; font: 14.5px var(--mono); color: var(--ink-3); background: var(--surface); transition: all .35s ease; }
+.tf-cell.gold { color: var(--ink); border-color: var(--ms-blue); }
+.tf-cell.pending { opacity: .35; }
+.tf-cell.ok { border-color: var(--good); color: var(--good); background: color-mix(in srgb, var(--ms-green) 10%, var(--surface)); }
+.tf-cell.miss { border-color: var(--bad); color: var(--bad); background: color-mix(in srgb, var(--ms-red) 10%, var(--surface)); }
+.tf-cell.forced { border-color: var(--ms-blue); color: var(--blue-ink); border-style: dashed; }
+.tf-cell.active { box-shadow: 0 0 0 3px color-mix(in srgb, var(--ms-yellow) 55%, transparent); }
+.tf-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-top: 18px; }
+.tf-q { font: 17px var(--mono); background: var(--surface-2); padding: 8px 14px; border-radius: 4px; }
+.tf-q b { color: var(--accent-ink); }
+.tf-note { font-size: 14.5px; color: var(--ink-2); min-height: 24px; flex: 1 1 260px; margin: 0; }
+@media (max-width: 620px) { .tf-grid { grid-template-columns: 78px repeat(5, 1fr); gap: 8px 6px; } .tf-cell { font-size: 12px; height: 38px; } .tf-row-label { font-size: 12.5px; } }
+
+blockquote.skill { margin: 22px 0 0; padding: 16px 20px; border-left: 4px solid var(--ms-yellow); background: var(--surface); border-radius: 0 var(--radius) var(--radius) 0; box-shadow: var(--shadow); }
+blockquote.skill .q { font-size: 16.5px; color: var(--ink); font-style: italic; margin: 0 0 8px; }
+blockquote.skill .src { font-size: 14px; color: var(--ink-3); margin: 0; }
+
+/* controls */
+.seg { display: inline-flex; flex-wrap: wrap; gap: 2px; background: var(--surface-2); padding: 3px; border-radius: 6px; }
+.seg button { border: 0; background: transparent; color: var(--ink-2); font: 400 14px var(--font); padding: 5px 12px; border-radius: 4px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 3px rgba(0,0,0,.14); font-weight: 600; }
+.seg-label { font-size: 13px; color: var(--ink-3); margin: 0 0 6px; }
+.controls { display: flex; flex-wrap: wrap; gap: 18px; margin-bottom: 18px; align-items: flex-end; }
+.iconbtn { border: 1px solid var(--line); background: var(--surface); color: var(--ink); width: 36px; height: 36px; border-radius: 4px; cursor: pointer; display: grid; place-items: center; flex: none; }
+.iconbtn svg { width: 16px; height: 16px; }
+input[type=range] { accent-color: var(--accent); width: 100%; }
+
+/* bars */
+.bars { display: grid; gap: 10px; }
+.bar-row { display: grid; grid-template-columns: 150px 1fr; gap: 12px; align-items: center; }
+.bar-name { font-size: 14.5px; color: var(--ink-2); text-align: right; }
+.bar-name.ours { color: var(--ink); font-weight: 700; }
+.bar-track { position: relative; height: 28px; }
+.bar-fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0; border-radius: 0 3px 3px 0; transition: width .9s cubic-bezier(.2,.8,.2,1); }
+.bar-err { position: absolute; top: 50%; height: 1.5px; background: var(--ink-3); transform: translateY(-50%); transition: left .9s cubic-bezier(.2,.8,.2,1), width .9s cubic-bezier(.2,.8,.2,1); }
+.bar-val { position: absolute; top: 50%; transform: translateY(-50%); font-size: 14px; font-weight: 600; color: var(--ink); white-space: nowrap; transition: left .9s cubic-bezier(.2,.8,.2,1); font-variant-numeric: tabular-nums; }
+.bar-val small { color: var(--ink-3); font-weight: 400; margin-left: 3px; }
+.bar-axis { display: grid; grid-template-columns: 150px 1fr; gap: 12px; margin-top: 6px; }
+.bar-axis .ticks { position: relative; height: 18px; border-top: 1px solid var(--line); font-size: 12px; color: var(--ink-3); }
+.bar-axis .ticks span { position: absolute; transform: translateX(-50%); top: 2px; }
+@media (max-width: 560px) { .bar-row, .bar-axis { grid-template-columns: 100px 1fr; } .bar-name { font-size: 13px; } }
+
+/* svg charts */
+.chart { width: 100%; height: auto; display: block; overflow: visible; }
+.chart text { font-family: var(--font); fill: var(--ink-3); font-size: 12px; }
+.chart .axis-title { fill: var(--ink-2); font-size: 12.5px; }
+.chart .gridline { stroke: var(--grid); stroke-width: 1; }
+.chart .baseline { stroke: var(--line); stroke-width: 1; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13.5px; color: var(--ink-2); margin: 10px 0 0; }
+.legend > span { display: inline-flex; align-items: center; gap: 7px; }
+.legend svg { width: 26px; height: 12px; overflow: visible; }
+.tooltip { position: fixed; pointer-events: none; z-index: 60; background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 9px 12px; font-size: 13px; line-height: 1.5; box-shadow: 0 6px 24px rgba(0,0,0,.16); opacity: 0; transition: opacity .12s; max-width: 270px; }
+.tooltip .tt-h { font-weight: 600; margin-bottom: 3px; }
+.tooltip .tt-r { display: flex; justify-content: space-between; gap: 16px; color: var(--ink-2); }
+.tooltip .tt-r b { color: var(--ink); font-variant-numeric: tabular-nums; }
+.tooltip .sw { display: inline-block; width: 9px; height: 9px; margin-right: 6px; }
+.opt-status { display: flex; flex-wrap: wrap; gap: 8px 22px; font-size: 14px; color: var(--ink-2); margin: 12px 0 4px; font-variant-numeric: tabular-nums; }
+.opt-status b { color: var(--ink); }
+.opt-controls { display: flex; gap: 12px; align-items: center; margin-top: 10px; }
+.multiples { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+@media (max-width: 720px) { .multiples { grid-template-columns: 1fr; } }
+.mult-title { font-size: 14.5px; font-weight: 600; color: var(--ink); margin: 0 0 4px; }
+
+/* ablation */
+.abl { display: grid; grid-template-columns: 140px 1fr 1fr; gap: 10px; max-width: 640px; }
+.abl .hd { font-size: 13.5px; color: var(--ink-3); display: flex; align-items: flex-end; justify-content: center; text-align: center; }
+.abl .rh { font-size: 13.5px; color: var(--ink-3); display: flex; align-items: center; justify-content: flex-end; text-align: right; padding-right: 4px; }
+.abl .cell { border-radius: var(--radius); border: 1px solid var(--line); background: var(--surface); padding: 14px; text-align: center; border-top: 3px solid var(--c, var(--line)); }
+.abl .cell .v { font: 700 28px/1.2 var(--font-display); font-variant-numeric: tabular-nums; }
+.abl .cell .d { font-size: 13px; color: var(--ink-3); }
+.abl .cell.full .v { color: var(--accent-ink); }
+.synergy { margin-top: 18px; display: grid; gap: 8px; max-width: 640px; }
+.syn-row { display: grid; grid-template-columns: 180px 1fr; gap: 12px; align-items: center; font-size: 14px; color: var(--ink-2); }
+.syn-track { height: 22px; display: flex; gap: 2px; }
+.syn-seg { height: 100%; border-radius: 2px; width: 0; transition: width .8s cubic-bezier(.2,.8,.2,1); }
+.syn-val { font-size: 13.5px; font-weight: 600; color: var(--ink); margin-left: 8px; align-self: center; white-space: nowrap; }
+@media (max-width: 560px) { .abl { grid-template-columns: 92px 1fr 1fr; } .syn-row { grid-template-columns: 1fr; gap: 2px; } }
+
+/* tables */
+.table-wrap { overflow-x: auto; margin: 16px 0 6px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 14.5px; font-variant-numeric: tabular-nums; }
+th, td { padding: 9px 12px; text-align: center; white-space: nowrap; }
+th { font-weight: 600; color: var(--ink); }
+thead tr:first-child th { border-bottom: 1px solid var(--line); }
+thead tr:last-child th { border-bottom: 1.5px solid var(--ink-3); font-weight: 400; color: var(--ink-2); }
+td:first-child, th:first-child { text-align: left; }
+tbody tr + tr td { border-top: 1px solid var(--grid); }
+tr.ours td { background: var(--accent-soft); font-weight: 600; color: var(--ink); }
+td .std { color: var(--ink-3); font-size: 12px; font-weight: 400; margin-left: 2px; }
+td.best { font-weight: 700; }
+details { margin-top: 14px; }
+summary { cursor: pointer; color: var(--accent-ink); font-size: 14.5px; }
+
+/* cost */
+.cost { display: grid; gap: 18px; }
+.cost-h { display: flex; justify-content: space-between; font-size: 14.5px; color: var(--ink); font-weight: 600; margin-bottom: 6px; }
+.cost-h .ratio { color: var(--accent-ink); }
+.cost-bar { display: grid; grid-template-columns: 120px 1fr; gap: 10px; align-items: center; font-size: 13px; color: var(--ink-3); margin-bottom: 5px; }
+.cost-fill { height: 16px; border-radius: 0 2px 2px 0; width: 0; transition: width 1.1s cubic-bezier(.2,.8,.2,1); position: relative; }
+.cost-fill span { position: absolute; left: calc(100% + 8px); top: 50%; transform: translateY(-50%); font-size: 12.5px; color: var(--ink-2); white-space: nowrap; }
+@media (max-width: 520px) { .cost-bar { grid-template-columns: 88px 1fr; } }
+
+/* library + bib */
+.lib pre, .bib pre { background: var(--code-bg); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 18px; margin: 12px 0 0; font: 13px/1.6 var(--mono); color: var(--ink); white-space: pre-wrap; word-break: break-word; max-height: 440px; overflow: auto; }
+.lib pre .h { color: var(--accent-ink); font-weight: 600; }
+.lib pre .c { color: var(--ink-3); }
+.bib { position: relative; }
+.bib pre { margin: 0; white-space: pre; word-break: normal; overflow-x: auto; padding-right: 76px; }
+.copy { position: absolute; top: 10px; right: 10px; border: 1px solid var(--line); background: var(--surface); color: var(--ink-2); border-radius: 4px; padding: 4px 10px; font: 13px var(--font); cursor: pointer; }
+footer { padding: 32px 0 56px; color: var(--ink-3); font-size: 13.5px; }
+footer .ms-stripe { margin-bottom: 14px; }
+
+.theme-toggle { position: fixed; top: 14px; right: 14px; z-index: 40; }
+.toc { display: none; }
+
+.reveal { opacity: 0; transform: translateY(12px); transition: opacity .7s ease, transform .7s ease; }
+.reveal.in { opacity: 1; transform: none; }
+@media (prefers-reduced-motion: reduce) { .reveal { opacity: 1; transform: none; transition: none; } * { transition-duration: 0s !important; } }
+
+/* =================================================================
+   Template 1: Classic. Centered hero and a single centered column.
+   ================================================================= */
+body[data-template="classic"] .hero { text-align: center; }
+body[data-template="classic"] .buttons { justify-content: center; }
+body[data-template="classic"] .authors span, body[data-template="classic"] .affils span { margin: 0 8px; }
+body[data-template="classic"] .authors { max-width: 820px; margin-left: auto; margin-right: auto; }
+body[data-template="classic"] section > .wrap > .split > .split-text,
+body[data-template="classic"] section > .wrap > .col-only { max-width: 760px; margin: 0 auto; }
+body[data-template="classic"] h2 { text-align: center; }
+body[data-template="classic"] .kicker { text-align: center; }
+body[data-template="classic"] section + section { border-top: 1px solid var(--line); }
+body[data-template="classic"] footer { text-align: center; }
+body[data-template="classic"] footer .ms-stripe { margin: 0 auto 14px; }
+
+/* =================================================================
+   Template 2: Article. Distill-style reading layout with a sticky TOC.
+   ================================================================= */
+body[data-template="article"] { --radius: 2px; }
+body[data-template="article"]::before { content: ""; display: block; height: 4px; background: linear-gradient(90deg, var(--ms-red) 0 25%, var(--ms-green) 25% 50%, var(--ms-blue) 50% 75%, var(--ms-yellow) 75%); }
+body[data-template="article"] .hero .ms-stripe { display: none; }
+body[data-template="article"] .hero { padding-top: 56px; border-bottom: 1px solid var(--line); padding-bottom: 28px; }
+body[data-template="article"] .hero h1 { font-weight: 600; font-size: clamp(30px, 4.6vw, 44px); }
+body[data-template="article"] .hero-meta { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 18px; margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--line); }
+body[data-template="article"] .meta-label { display: block !important; font-size: 13px; color: var(--ink-3); margin-bottom: 4px; }
+body[data-template="article"] .authors span { display: block; margin: 0; font-size: 15.5px; }
+body[data-template="article"] .affils span { display: block; margin: 0 0 2px; }
+body[data-template="article"] section > .wrap > .split > .split-text,
+body[data-template="article"] section > .wrap > .col-only { max-width: 700px; }
+body[data-template="article"] h2 { font-weight: 600; font-size: 26px; padding-top: 12px; border-top: 1px solid var(--line); }
+body[data-template="article"] section { padding: 30px 0; }
+body[data-template="article"] .kicker { display: none; }
+body[data-template="article"] .card, body[data-template="article"] .tile, body[data-template="article"] blockquote.skill { box-shadow: none; }
+body[data-template="article"] .figure { border: 0; padding: 0; }
+@media (min-width: 1260px) {
+  body[data-template="article"] .wrap { margin-left: max(240px, calc(50% - 400px)); margin-right: auto; max-width: min(1040px, calc(100% - max(240px, calc(50% - 400px)) - 16px)); }
+  body[data-template="article"] .toc { display: block; position: fixed; top: 96px; left: max(16px, calc(50% - 640px)); width: 200px; font-size: 13.5px; }
+  body[data-template="article"] .toc .toc-h { color: var(--ink); font-weight: 600; margin-bottom: 8px; }
+  body[data-template="article"] .toc a { display: block; color: var(--ink-3); padding: 4px 0 4px 10px; border-left: 2px solid var(--line); text-decoration: none; }
+  body[data-template="article"] .toc a:hover { color: var(--ink); }
+  body[data-template="article"] .toc a.on { color: var(--accent-ink); border-left-color: var(--accent); }
+}
+@media (max-width: 720px) { body[data-template="article"] .hero-meta { grid-template-columns: 1fr; } }
+
+/* =================================================================
+   Template 3: Showcase. Dark hero band and alternating section bands.
+   ================================================================= */
+body[data-template="showcase"] .hero { background: #1B1B1B; color: #fff; padding: 0 0 56px; position: relative; }
+body[data-template="showcase"] .hero .ms-stripe { width: 100%; height: 6px; margin: 0 0 64px; }
+body[data-template="showcase"] .hero h1 { font-weight: 600; font-size: clamp(34px, 5.6vw, 56px); color: #fff; }
+body[data-template="showcase"] .hero h1 .name { color: #4CC2FF; }
+body[data-template="showcase"] .hero .sub { color: #D0D0D0; }
+body[data-template="showcase"] .hero .authors { color: #fff; }
+body[data-template="showcase"] .hero .affils, body[data-template="showcase"] .hero .contact { color: #B8B8B8; }
+body[data-template="showcase"] .hero a { color: #6CCBFF; }
+body[data-template="showcase"] .hero .btn { background: #fff; color: #1B1B1B; }
+body[data-template="showcase"] .hero .btn.disabled { background: transparent; color: #9A9A9A; border-color: #444; }
+body[data-template="showcase"] section:nth-of-type(odd) { background: var(--band); }
+body[data-template="showcase"] section { padding: 64px 0; }
+body[data-template="showcase"] h2 { font-size: 32px; }
+body[data-template="showcase"] .kicker { display: inline-block; font-size: 13px; color: var(--ink); padding-left: 10px; border-left: 4px solid var(--ms-blue); }
+body[data-template="showcase"] section:nth-of-type(4n+1) .kicker { border-left-color: var(--ms-red); }
+body[data-template="showcase"] section:nth-of-type(4n+2) .kicker { border-left-color: var(--ms-green); }
+body[data-template="showcase"] section:nth-of-type(4n+3) .kicker { border-left-color: var(--ms-blue); }
+body[data-template="showcase"] section:nth-of-type(4n) .kicker { border-left-color: var(--ms-yellow); }
+body[data-template="showcase"] section > .wrap > .split > .split-text,
+body[data-template="showcase"] section > .wrap > .col-only { max-width: 780px; }
+body[data-template="showcase"] .card { border-radius: 2px; }
+body[data-template="showcase"] #tldr { background: #1B1B1B; padding-top: 0; }
+body[data-template="showcase"] #tldr .lead { color: #EDEDED; }
+body[data-template="showcase"] #tldr .tile { background: #262626; border-color: #333; color: #fff; box-shadow: none; }
+body[data-template="showcase"] #tldr .tile .lbl { color: #C8C8C8; }
+body[data-template="showcase"] #tldr .tile:nth-child(1) { --ci: #FF8A65; }
+body[data-template="showcase"] #tldr .tile:nth-child(2) { --ci: #A6E05A; }
+body[data-template="showcase"] #tldr .tile:nth-child(3) { --ci: #6CCBFF; }
+body[data-template="showcase"] #tldr .tile:nth-child(4) { --ci: #FFCE4D; }
+
+/* =================================================================
+   Template 4: Compact. Teaser in the hero, text beside each chart.
+   ================================================================= */
+body[data-template="compact"] { font-size: 15.5px; }
+body[data-template="compact"] .wrap { max-width: 1220px; }
+body[data-template="compact"] .hero { padding: 40px 0 24px; }
+body[data-template="compact"] .hero .ms-stripe { width: 100%; height: 4px; margin: -40px 0 36px; }
+body[data-template="compact"] .hero h1 br { display: none; }
+body[data-template="compact"] .hero h1 { font-size: clamp(28px, 3.6vw, 38px); font-weight: 600; }
+body[data-template="compact"] .hero .sub { font-size: 18px; margin-bottom: 16px; }
+body[data-template="compact"] .authors, body[data-template="compact"] .affils { font-size: 14.5px; }
+body[data-template="compact"] section { padding: 32px 0; border-top: 1px solid var(--line); }
+body[data-template="compact"] h2 { font-size: 23px; }
+body[data-template="compact"] h3 { font-size: 17px; margin-top: 22px; }
+body[data-template="compact"] .lead { font-size: 16.5px; }
+body[data-template="compact"] .card { padding: 16px; }
+body[data-template="compact"] .tile .num { font-size: 30px; }
+@media (min-width: 980px) {
+  body[data-template="compact"] .hero-grid { display: grid; grid-template-columns: 5fr 6fr; gap: 36px; align-items: center; }
+  body[data-template="compact"] .hero-teaser { display: block; margin: 0; }
+  body[data-template="compact"] .split { display: grid; grid-template-columns: 5fr 7fr; gap: 36px; align-items: start; }
+  body[data-template="compact"] .split-viz { margin-top: 0; position: sticky; top: 24px; }
+  body[data-template="compact"] .split-viz .cards3 { grid-template-columns: 1fr; }
+  body[data-template="compact"] .split-viz > .card:first-child, body[data-template="compact"] .split-viz > .figure:first-child { margin-top: 0; }
+}
+@media (max-width: 979px) { body[data-template="compact"] .hero-teaser { display: block; margin-top: 24px; } }
+
+/* reflect, edit, validate loop */
+.rl { margin-top: 0; }
+.rl-grid { display: grid; grid-template-columns: 300px 1fr; gap: 28px; align-items: center; }
+.rl-ring svg { width: 100%; height: auto; display: block; overflow: visible; }
+.rl-ring text { font-family: var(--font); }
+.rl-node circle { transition: fill .35s ease, stroke-width .35s ease; }
+.rl-node.on circle { stroke-width: 4; }
+.rl-arc { transition: stroke .35s ease, stroke-width .35s ease; }
+.rl-lib { transform-box: fill-box; transform-origin: center; }
+.rl-lib.pulse { animation: rlPulse .7s ease; }
+@keyframes rlPulse { 0% { transform: scale(1); } 40% { transform: scale(1.12); } 100% { transform: scale(1); } }
+.rl-panel { min-height: 300px; display: flex; flex-direction: column; }
+.rl-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 10px; }
+.rl-stage { display: inline-flex; align-items: center; gap: 9px; font-weight: 600; font-size: 17px; color: var(--ink); }
+.rl-step { font-size: 13.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.rl-title { font-size: 14.5px; color: var(--ink-2); margin: 0 0 8px; }
+.rl-body > * { animation: rlIn .45s ease both; animation-delay: var(--d, 0s); }
+@keyframes rlIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.rl-kv { display: grid; grid-template-columns: 104px 1fr; gap: 10px; padding: 7px 0; border-top: 1px solid var(--grid); font-size: 14.5px; color: var(--ink); }
+.rl-kv > span { color: var(--ink-3); font-size: 13.5px; padding-top: 1px; }
+.rl-code { font: 13.5px/1.5 var(--mono); word-break: break-word; }
+.rl-bad { color: var(--bad); }
+.rl-good { color: var(--good); }
+.rl-diff { font: 13.5px/1.55 var(--mono); padding: 10px 12px; border-radius: 4px; border-left: 3px solid var(--ms-green); background: color-mix(in srgb, var(--ms-green) 9%, var(--surface)); color: var(--ink); min-height: 64px; }
+.rl-diff.replace { border-left-color: var(--ms-yellow); background: color-mix(in srgb, var(--ms-yellow) 12%, var(--surface)); }
+.rl-op { display: block; font: 600 12.5px var(--font); color: var(--ink-2); margin-bottom: 3px; }
+.rl-caret { display: inline-block; width: 7px; height: 1em; background: var(--ink-2); vertical-align: -2px; margin-left: 1px; animation: rlBlink 1s steps(1) infinite; }
+@keyframes rlBlink { 50% { opacity: 0; } }
+.rl-rej { margin-top: 12px; font-size: 13.5px; color: var(--ink-3); }
+.rl-rej s { display: block; color: var(--bad); margin-top: 3px; text-decoration-thickness: 1px; }
+.rl-bars { display: grid; gap: 10px; margin: 6px 0 14px; }
+.rl-bar-row { display: grid; grid-template-columns: 136px 1fr 48px; gap: 10px; align-items: center; font-size: 14px; color: var(--ink-2); }
+.rl-track { height: 16px; background: var(--surface-2); border-radius: 2px; overflow: hidden; }
+.rl-fill { height: 100%; width: 0; transition: width .9s cubic-bezier(.2,.8,.2,1); }
+.rl-val { font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; text-align: right; }
+.rl-verdict { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: 4px; font-size: 14.5px; color: var(--ink); animation: rlPop .4s ease both; }
+.rl-verdict b { white-space: nowrap; }
+.rl-verdict.acc { background: color-mix(in srgb, var(--ms-green) 13%, var(--surface)); }
+.rl-verdict.acc b { color: var(--good); }
+.rl-verdict.rej { background: color-mix(in srgb, var(--ms-red) 11%, var(--surface)); }
+.rl-verdict.rej b { color: var(--bad); }
+@keyframes rlPop { from { opacity: 0; transform: scale(.97); } to { opacity: 1; transform: none; } }
+.rl-foot { display: flex; align-items: center; gap: 14px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--grid); }
+.rl-timeline { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.rl-timeline .lbl { font-size: 13px; color: var(--ink-3); margin-right: 4px; }
+.rl-dot { width: 30px; height: 30px; border-radius: 50%; border: 1.5px solid var(--line); background: var(--surface); color: var(--ink-3); font: 600 12.5px var(--font); cursor: pointer; display: grid; place-items: center; padding: 0; transition: all .3s ease; }
+.rl-dot.acc { background: var(--good); border-color: var(--good); color: #fff; }
+.rl-dot.rej { background: var(--bad); border-color: var(--bad); color: #fff; }
+.rl-dot.cur { border-color: var(--ink); color: var(--ink); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ms-blue) 35%, transparent); }
+@media (max-width: 760px) {
+  .rl-grid { grid-template-columns: 1fr; gap: 12px; }
+  .rl-ring { max-width: 280px; margin: 0 auto; width: 100%; }
+  .rl-panel { min-height: 330px; }
+}
+
+/* learned library browser */
+.lib-controls { display: flex; flex-wrap: wrap; gap: 18px; margin: 4px 0 14px; align-items: flex-end; }
+.seg button:disabled { opacity: .38; cursor: not-allowed; }
+.lib-card { padding: 16px; }
+.lib-top { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; margin-bottom: 12px; }
+.lib-search { flex: 1 1 220px; min-width: 0; font: 14px var(--font); padding: 7px 10px; border: 1px solid var(--line); border-radius: 4px; background: var(--surface); color: var(--ink); }
+.lib-search:focus { outline: 2px solid var(--accent); outline-offset: 0; border-color: transparent; }
+.lib-count { font-size: 13px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.lib-list { max-height: 640px; overflow: auto; display: grid; gap: 10px; padding-right: 4px; align-content: start; }
+.lib-list > * { animation: libIn .35s ease both; }
+@keyframes libIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+.lib-empty { color: var(--ink-3); font-size: 14.5px; padding: 18px 4px; }
+.sk-list { margin: 0; padding: 4px 8px 4px 34px; font-size: 15px; line-height: 1.6; color: var(--ink); }
+.sk-list li { padding: 7px 0 7px 4px; border-bottom: 1px solid var(--grid); }
+.sk-list li:last-child { border-bottom: 0; }
+.sk-list li::marker { color: var(--ink-3); font-size: 13px; }
+.sk { display: grid; grid-template-columns: 34px 1fr; gap: 10px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); }
+.sk-n { font: 600 13px/1.6 var(--mono); color: var(--ink-3); }
+.sk-rule { color: var(--ink); font-size: 15px; line-height: 1.55; margin: 0 0 8px; }
+.sk-ex { display: grid; grid-template-columns: 74px 1fr; gap: 3px 10px; font-size: 13.5px; background: var(--surface-2); border-radius: 4px; padding: 8px 10px; }
+.sk-ex > span { color: var(--ink-3); }
+.sk-ex > div { color: var(--ink-2); word-break: break-word; }
+.sk-ex code { font: 12.5px/1.5 var(--mono); }
+.sk-ex .good { color: var(--good); }
+.sk-ex .bad { color: var(--bad); }
+.wf { border: 1px solid var(--line); border-radius: 6px; padding: 12px 14px; background: var(--surface); }
+.wf-name { font: 600 14px var(--mono); color: var(--accent-ink); word-break: break-word; }
+.wf-desc { font-size: 14px; color: var(--ink-2); margin: 4px 0 8px; }
+.wf ol { margin: 0; padding-left: 24px; font: 12.5px/1.65 var(--mono); color: var(--ink); }
+.wf li { word-break: break-word; }
+.wf .wf-sub { padding-left: 18px; margin: 2px 0 4px; list-style: disc; color: var(--ink-2); }
+.wf .c { color: var(--ink-3); }
+.wf .x { font: 12.5px/1.65 var(--mono); color: var(--ink-2); white-space: pre-wrap; margin: 4px 0 0; }
+.lib-list mark { background: color-mix(in srgb, var(--ms-yellow) 45%, transparent); color: inherit; padding: 0 1px; border-radius: 2px; }
+@media (max-width: 560px) { .sk { grid-template-columns: 1fr; gap: 4px; } .sk-ex { grid-template-columns: 1fr; } .sk-ex > span { margin-top: 4px; } }
+#proxy {
+  padding: 20px 0 0 0;
+}
+</style>
+
+</head>
+<body data-template="classic">
+
+<button class="iconbtn theme-toggle" id="themeToggle" aria-label="Toggle dark mode" title="Toggle dark mode">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg>
+</button>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="hero-grid">
+      <div class="hero-text">
+        <h1><span class="name">TeleTune</span>: Evolving Agent Skills <br>From Offline Telemetry</h1>
+        
+        <div class="hero-meta">
+          <div>
+            <span class="meta-label" style="display:none">Authors</span>
+            <div class="authors">
+              <span>Justin Chih-Yao Chen<sup>1</sup></span>
+              <span>Elias Stengel-Eskin<sup>3</sup></span>
+              <span>Yan Chen<sup>2</sup></span>
+              <span>Pol Llado<sup>2</sup></span>
+              <span>Scott Counts<sup>2</sup></span>
+              <span>Mohit Bansal<sup>1</sup></span>
+              <span>Benjamin Van Durme<sup>2</sup></span>
+              <span>Harsh Jhamtani<sup>2</sup></span>
+              <span>Gaurav Verma<sup>2</sup></span>
+            </div>
+          </div>
+          <div>
+            <span class="meta-label" style="display:none">Affiliations</span>
+            <div class="affils"><span><sup>1</sup>UNC Chapel Hill</span><span><sup>2</sup>Microsoft</span><span><sup>3</sup>University of Texas at Austin</span></div>
+          </div>
+          
+        </div>
+        <div class="buttons">
+          <a class="btn" href="static/teletune.pdf"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><path d="M14 2v6h6"></path><path d="M8 13h8M8 17h5"></path></svg>Paper</a>
+          <!-- TODO: replace "#" with the arXiv abstract URL -->
+          <a class="btn" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4h6a4 4 0 0 1 4 4v13a3 3 0 0 0-3-3H2z"></path><path d="M22 4h-6a4 4 0 0 0-4 4v13a3 3 0 0 1 3-3h7z"></path></svg>arXiv</a>
+          <!-- TODO: replace "#" with the code repository URL -->
+          <a class="btn" href="#"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5a12 12 0 0 0-3.8 23.4c.6.1.8-.3.8-.6v-2c-3.3.7-4-1.6-4-1.6-.6-1.4-1.4-1.8-1.4-1.8-1.1-.7.1-.7.1-.7 1.2.1 1.9 1.2 1.9 1.2 1.1 1.9 2.9 1.3 3.6 1 .1-.8.4-1.3.8-1.6-2.7-.3-5.5-1.3-5.5-5.9 0-1.3.5-2.4 1.2-3.2-.1-.3-.5-1.5.1-3.2 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0C17.3 4.6 18.3 5 18.3 5c.7 1.7.2 2.9.1 3.2.8.8 1.2 1.9 1.2 3.2 0 4.6-2.8 5.6-5.5 5.9.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6A12 12 0 0 0 12 .5z"></path></svg>Code</a>
+        </div>
+      </div>
+      
+    </div>
+  </div>
+</header>
+
+<main>
+
+<section id="proxy">
+  <div class="wrap">
+    <div class="split">
+      <div class="split-viz">
+        <div class="card reveal">
+          <svg class="chart" id="optChart" data-gen="" viewBox="0 0 900 360" role="img" aria-label="Skill-guided progress and live success rate across optimization steps on WorkArena L1"></svg>
+          <div class="legend" id="optLegend" data-gen=""></div>
+          <div class="opt-status" id="optStatus" data-gen=""></div>
+          <div class="opt-controls">
+            <button class="iconbtn" id="optPlay" aria-label="Play optimization run"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4v16l13-8z"></path></svg></button>
+            <input type="range" id="optSlider" min="1" max="27" value="27" aria-label="Optimization step">
+          </div>
+        </div>
+      </div>
+        <div class="split-text" style="padding: 40px 0 36px 0;">
+        <p class="reveal">Many real-world software systems offer no live environment for agent skill learning. We therefore propose an offline metric, which we call skill-guided progress, to test whether updating skills on offline logs can stand in for the live success rate. We observe that optimizing for skill-guided progress incease the live success rate from 74.1% to 83.1%, 88.7%, and 92.3%, without using the downstream task success rate and live environment during optimization process.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="abstract">
+  <div class="wrap"><div class="col-only">
+    <h2 class="reveal">Abstract</h2>
+    <p class="reveal">Computer-use agents need to capture procedural knowledge of how people use software. User telemetry, i.e., logs of interface states and user actions, offers a scalable source of this knowledge. However, learning reusable skills from these logs requires addressing three challenges. <strong>(1) Goal Underspecification</strong>, since logs do not record the goal behind each action; <strong>(2) Non-Replayability</strong>, since past activity cannot be replayed to evaluate skill updates; and <strong>(3) Interleaved Trajectories</strong>, since logs may mix several tasks without marking their boundaries.</p>
+    <p class="reveal">To address these challenges, we introduce <span class="sc">TeleTune</span>, a framework for learning a textual skill library from offline logs that carry no recorded goals, cannot be replayed during optimization, and may interleave tasks. The library contains workflows describing cross-instance procedures and skills guiding individual task decisions, both provided as context to the agent at test time. <span class="sc">TeleTune</span> uses action-prediction errors on logged trajectories to propose library edits and keeps only those that improve held-out action-prediction accuracy, which we call <em>skill-guided progress</em>. The learned workflows also enable retrieval of demonstrations that cover the subgoals of a new task. At test time, the agent is provided with the learned library and the workflow-based retrieved demonstrations.</p>
+    <p class="reveal">Experiments on WorkArena and Online-Mind2Web show that <span class="sc">TeleTune</span> outperforms random retrieval, Agent Workflow Memory (AWM), and their combination. We find that the best baseline varies by setting, whereas <span class="sc">TeleTune</span> achieves average success rates of 77.1% and 80.6%, respectively, improving over the strongest baseline on each benchmark by 6.7% and 7.7%. Under the heaviest perturbation of the WorkArena training data, <span class="sc">TeleTune</span> keeps the highest average success rate at 68.5%, 6.3% above the strongest baseline. Finally, our analyses show that skill optimization and workflow-based retrieval are complementary, that optimizing on fixed logs costs 5 to 75 times fewer tokens than validating the same edits with live episodes, and that skill-guided progress tracks the live success rate.</p>
+  </div></div>
+</section>
+
+<section id="motivation">
+  <div class="wrap">
+    <div class="split">
+      <div class="split-text">
+        <h2 class="reveal">Why Is Telemetry Hard to Learn From?</h2>
+        <p class="reveal">Completing a task in an unfamiliar software system requires knowing more than which buttons to click. An agent handling a service request may need to locate the relevant record, check its fields, and follow a local procedure before changing its status. Telemetry captures how users carry out such recurring procedures. Unlike the goal-labeled trajectories used in the skill-learning literature, it records ongoing user activity whose goals and task boundaries are implicit.</p>
+      </div>
+      <div class="split-viz">
+        <div class="figure reveal"><img src="static/images/fig1.png" alt="Comparison of execution-based skill refinement, offline user telemetry, and TeleTune" loading="lazy"><p class="caption"><b>Learning transferable agent skills from offline user telemetry.</b> (a) Execution-based skill refinement uses explicit task goals and outcome feedback with a live environment. (b) User telemetry does not record the goal behind each action, and revising a skill cannot produce new outcomes for the logged activity. The logs may also interleave tasks. (c) <span class="sc">TeleTune</span> infers a goal for each logged trajectory, uses prediction errors on the fixed logs to propose skill edits, and keeps edits that improve skill-guided progress.</p></div>
+        <div class="cards3">
+      <div class="card reveal"><h4><span class="sq" style="background:var(--ms-red)"></span>Goal Underspecification</h4><p>Logs record what a user did, but typically do not record the goal behind each action sequence.</p></div>
+      <div class="card reveal"><h4><span class="sq" style="background:var(--ms-green)"></span>Non-Replayability</h4><p>We cannot ask users to repeat their tasks each time we update a skill library, and logs do not preserve a resettable environment. We must evaluate updates offline.</p></div>
+      <div class="card reveal"><h4><span class="sq" style="background:var(--ms-yellow)"></span>Interleaved Trajectories</h4><p>A user might interrupt a record update to look something up elsewhere, handle an unrelated request, and then return to the original record.</p></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="method">
+  <div class="wrap">
+    <div class="split">
+      <div class="split-text">
+        <h2 class="reveal">How <span class="sc">TeleTune</span> Works</h2>
+        <p class="reveal">Our central idea is to use the prediction of recorded actions as the learning signal for building and revising the skill library. The library is one text document with two kinds of entries. A <strong>workflow</strong> gives the ordered steps of a procedure that recurs across tasks, with instance-specific values written as placeholders. A <strong>skill</strong> resolves a single decision that a procedure leaves open, such as which field to fill first. We keep the agent's weights frozen and learn only the library.</p>
+      </div>
+      <div class="split-viz">
+        <div class="figure reveal"><img src="static/images/method.png" alt="Overview of TeleTune: offline skill optimization and inference with workflow-based retrieval" loading="lazy"><p class="caption"><b>Overview of <span class="sc">TeleTune</span>.</b> (a) The predictor runs through each train-split trajectory with the current skill library in its prompt. The optimizer reflects on the first prediction error in each trajectory and proposes edits, and we keep the candidate library only if it has higher skill-guided progress on the dev split. (b) At inference, workflow-based retrieval selects complementary demonstrations for the new task.</p></div>
+      </div>
+    </div>
+
+    <div class="split">
+      <div class="split-text">
+        <h3 class="reveal">Skill-Guided Progress: Scoring a Library on Fixed Logs</h3>
+        <p class="reveal">We run the predictor step by step through each logged trajectory, conditioned on an inferred goal, the current library, and the action history. After each prediction, we append the recorded action to the history (teacher forcing). An early error therefore does not derail later steps, and every scoreable step still gives feedback. We call the resulting action-prediction accuracy <em>skill-guided progress</em>, Q.</p>
+      </div>
+      <div class="split-viz">
+        <div class="card reveal" id="tf">
+          <div class="tf-grid" id="tfGrid" data-gen=""></div>
+          <div class="tf-foot">
+            <div class="tf-q">Q = <b id="tfQ">4</b> / <span id="tfN">5</span></div>
+            <p class="tf-note" id="tfNote">Skill-guided progress for this trajectory is 4/5. The error at step 3 becomes a failure case for the optimizer.</p>
+            <button class="iconbtn" id="tfPlay" aria-label="Replay the animation"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4v16l13-8z"></path></svg></button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="split">
+      <div class="split-text">
+        <h3 class="reveal">An Offline Reflect, Edit, Validate Loop</h3>
+        <p class="reveal">The library starts with workflows induced from the training trajectories and no skills. Optimization then runs in two stages. The workflow stage edits only workflows, and the skill stage then edits only skills while the workflows stay fixed. At each step, we reflect on prediction errors, edit the library, and validate the candidate on the dev split.</p>
+      </div>
+      <div class="split-viz">
+        <div class="card reveal rl" id="revLoop">
+          <div class="rl-grid">
+            <div class="rl-ring"><svg id="rlSvg" viewBox="0 0 300 300" role="img" aria-label="The reflect, edit, validate loop" data-gen></svg></div>
+            <div class="rl-panel" aria-live="polite">
+              <div class="rl-head"><span class="rl-stage" id="rlStage" data-gen></span><span class="rl-step" id="rlStep" data-gen></span></div>
+              <div class="rl-body" id="rlBody" data-gen></div>
+            </div>
+          </div>
+          <div class="rl-foot">
+            <button class="iconbtn" id="rlPlay" aria-label="Pause the loop"></button>
+            <div class="rl-timeline" id="rlTimeline" data-gen></div>
+          </div>
+        </div>
+        
+      </div>
+    </div>
+
+    
+  </div>
+</section>
+
+<section id="results">
+  <div class="wrap">
+    <div class="split">
+      <div class="split-text">
+        <h2 class="reveal"><span class="sc">TeleTune</span> Outperforms All Baselines Across Benchmarks</h2>
+        <p class="reveal">With GPT-5.4 as the agent, <span class="sc">TeleTune</span> achieves the best success rate across every level of WorkArena and Online-Mind2Web. Importantly, the largest gains are on WorkArena L1 (80.3% → 92.3%) and on the hardest Online-Mind2Web tasks (64.7% → 75.3%). The strongest baseline changes by setting. AWM + Random-<i>k</i> is the strongest on WorkArena, yet on Online-Mind2Web it falls below both AWM and Random-<i>k</i>.</p>
+      </div>
+      <div class="split-viz">
+        <div class="card reveal">
+          <div class="controls">
+            <div><div class="seg-label">WorkArena</div><div class="seg" id="mainSegA" data-gen=""></div></div>
+            <div><div class="seg-label">Online-Mind2Web</div><div class="seg" id="mainSegB" data-gen=""></div></div>
+          </div>
+          <div class="bars" id="mainBars" data-gen=""></div>
+          <div class="bar-axis"><div></div><div class="ticks" id="mainTicks" data-gen=""></div></div>
+          <details open="">
+            <summary>Show full table</summary>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr><th></th><th colspan="3">WorkArena</th><th colspan="4">Online-Mind2Web</th></tr>
+                  <tr><th>Method</th><th>L1</th><th>L2</th><th>Avg.</th><th>Easy</th><th>Medium</th><th>Hard</th><th>Avg.</th></tr>
+                </thead>
+                <tbody id="mainTable" data-gen=""></tbody>
+              </table>
+            </div>
+          </details>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="interleaving">
+  <div class="wrap">
+    <div class="split">
+      <div class="split-text">
+        <h2 class="reveal"><span class="sc">TeleTune</span> Keeps the Highest Success on Interleaved Data</h2>
+        <p class="reveal">To test learning from interleaved tasks under controlled conditions, we perturb the WorkArena training pool with an interruption rate <i>q</i>. We split each training trajectory into chunks of 2 to 5 actions and, before each chunk, insert with probability <i>q</i> the next chunk of a secondary task. A perturbed trajectory thus switches back and forth between coherent tasks, as an interrupted user would. We then rebuild every method from the perturbed pool.</p>
+        <p class="reveal"><span class="sc">TeleTune</span> has the highest success on both levels at every <i>q</i> except L1 at <i>q</i> = 1.0, where it is 1.1% below Random-<i>k</i>. AWM's L1 success falls by 26.4% to 49.3%, only 3.7% above the naive agent, which uses no training trajectories at all.</p>
+      </div>
+      <div class="split-viz">
+        <div class="card reveal">
+          <div class="multiples">
+            <div><div class="mult-title">WorkArena L1</div><svg class="chart" id="qL1" data-gen="" viewBox="0 0 440 280"></svg></div>
+            <div><div class="mult-title">WorkArena L2</div><svg class="chart" id="qL2" data-gen="" viewBox="0 0 440 280"></svg></div>
+          </div>
+          <div class="legend" id="qLegend" data-gen=""></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="cost">
+  <div class="wrap">
+    <div class="split">
+      <div class="split-text">
+        <h2 class="reveal">Offline Optimization Saves Tokens</h2>
+        <p class="reveal">We learn one library per setting and reuse it unchanged across every test task and seed. Almost all optimization tokens go to the predictor scoring candidate libraries on the dev split, and the optimizer accounts for under 0.5%. On L1, running each of the 32 candidates on the 138 dev tasks would take 4,416 live episodes, or about 2.8B input tokens, 16 times our total. Live validation would also need a resettable environment for every dev task, which logs do not provide.</p>
+        <p class="reveal"><span class="sc">TeleTune</span> does use more input tokens at test time, because the library is included in the prompt at every step. On L1, it uses 636.9K input tokens per episode against 343.4K to 386.1K for the baselines, while its episode length stays within the baseline range. Giving Random-<i>k</i> more context does not close the gap. With <i>k</i> = 30, it uses 504.2K input tokens per L1 episode and reaches only 63.7%.</p>
+      </div>
+      <div class="split-viz">
+        <div class="card reveal">
+          <div class="cost" id="costBars" data-gen=""></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="libraries">
+  <div class="wrap">
+    <div class="col-only">
+      <h2 class="reveal">What Does a Learned Library Look Like?</h2>
+      <p class="reveal">Each skill is a short rule the optimizer wrote from an observed prediction error. Workflows use placeholders for the values that vary across instances. Browse the full library each backbone learned on each training set, and search across skills and workflows.</p>
+    </div>
+    <div class="lib reveal">
+      <div class="lib-controls">
+        <div><div class="seg-label">Backbone</div><div class="seg" id="libModel" data-gen></div></div>
+        <div><div class="seg-label">Training data</div><div class="seg" id="libBench" data-gen></div></div>
+      </div>
+      <div class="card lib-card">
+        <div class="lib-top">
+          <div class="seg" id="libTabs" data-gen></div>
+          <input class="lib-search" id="libSearch" type="search" placeholder="Search this library" aria-label="Search this library">
+          <span class="lib-count" id="libCount" data-gen></span>
+        </div>
+        <div class="lib-list" id="libList" data-gen></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="citation">
+  <div class="wrap">
+    <h2 class="reveal">Citation</h2>
+    <div class="bib reveal">
+      <pre id="bibtex">@article{chen2026teletune,
+    title={TeleTune: Evolving Agent Skills From Offline Telemetry},
+    author={Chen, Justin Chih-Yao and Stengel-Eskin, Elias and Chen, Yan and Llado, Pol and Counts, Scott and Bansal, Mohit and Durme, Benjamin Van and Jhamtani Harsh and Verma, Gaurav},
+    journal={arXiv preprint arXiv:xxxx.xxxxx},
+    year={2026}}</pre>
+      <button class="copy" id="copyBib">Copy</button>
+    </div></div>
+</section>
+
+</main>
+
+<div class="tooltip" id="tt"></div>
+
+<!-- ======================== page runtime ======================== -->
+<script type="application/json" id="libJSON">{"gpt|l1": "### Skill\n\n1. When a creation form is already open and there are no prior actions, begin by focusing the first required editable field rather than clicking New/Create New again. Example: for goal 'Create an incident record for a user's login issue with a resolution note.', after no prior actions, the correct next action is click(\"Short description\") (not click(\"Create New\")).\n2. On a blank create form, start with the first required field that anchors the record, which may be a reference field instead of a button. Example: for goal 'Create a compute hardware asset record with specified attributes and assignment details.', after no prior actions, the correct next action is click(\"Model category\") (not click(\"New\")).\n3. For change request creation, start by clicking the first visible required content field on the form; do not try to reopen the form. Example: for goal 'Create a change request for adding a network switch to a cabinet.', after no prior actions, the correct next action is click(\"Justification\") (not click(\"New\")).\n4. In list filters, if the needed value is absent or no value widget is available after setting field and operator, finish the filter by running it instead of guessing a value. Example: for goal 'Find hardware assets with missing installation status assigned to a specific user.', after click(\".list_filter_toggle\"), setting install_status = Missing, adding AND assigned_to =, the correct next action is click(\"Run\") (not select_option(\"nth=1\", \"Abel Tuter\")).\n5. After completing all intended filter clauses, or when the final clause has field and operator set but no selectable target value is evident, execute the filter with Run rather than interacting with unrelated controls. Example: for goal 'Find user records matching multiple specific attribute criteria.', after setting timezone, default_perspective =, and internal_integration_user = false, the correct next action is click(\"Run\") (not click(\"nth=0\")).\n6. For OR-based filters, if the last condition's field and operator are set and the requested value cannot be confirmed from the UI, prefer running the filter over inventing a likely value. Example: for goal 'Find change requests matching type, risk, or model criteria.', after setting type = Standard, risk = High, and chg_model =, the correct next action is click(\"Run\") (not select_option(\"nth=2\", \"Emergency Change\")).\n7. For knowledge-base search tasks, phrase the query as the specific fact being asked for, using the canonical wording from the request or known answer pattern rather than a loose paraphrase. Example: for goal 'Find knowledge information about department employee counts.', after no prior actions, the correct next action is fill(\"Search\", \"\\\"number of employees in department X\\\"\") (not fill(\"Search\", \"\\\"department employee counts\\\"\"))\n8. When creating incidents after focusing Short description, enter the concrete user-reported issue text from the task, not a generic restatement of the goal. Example: for goal 'Create an incident record documenting a hardware issue and its resolution.', after click(\"Short description\"), the correct next action is fill(\"Short description\", \"My disk is still having issues. Can't delete a file\") (not fill(\"Short description\", \"Hardware issue and its resolution\"))\n9. For problem record creation, begin with the form's primary problem narrative field when present, not Short description by default. Example: for goal 'Create a problem record for a database performance issue.', after no prior actions, the correct next action is click(\"Problem statement\") (not click(\"Short description\"))\n10. For change request creation, if the task centers on routing work to a team, start with the assignment reference field instead of a narrative text field. Example: for goal 'Create a change request to transfer Oracle database support activities to a specialized group.', after no prior actions, the correct next action is click(\"Assignment group\") (not click(\"Justification\"))\n11. In hardware asset creation, after selecting Model category and Model, continue with remaining core reference fields such as Vendor before moving to identifier fields like Asset tag. Example: for goal 'Create a shared compute hardware asset record for a specific device.', after click(\"Model category\"), fill(\"Model category\", \"Computer\"), click(\"nth=0\"), click(\"Model\"), fill(\"Model\", \"Apple MacBook Pro 16\"), click(\"nth=0\"), the correct next action is click(\"Vendor\") (not click(\"Asset tag\"))\n12. When a form field is already focused for record creation, fill it with the exact task-provided field value, not a generic paraphrase of the goal. Example: for goal 'Create a problem record for a connectivity issue with a hardware device categorized under software.', after click(\"Problem statement\"), the correct next action is fill(\"Problem statement\", \"Issue in connecting to internet using modem.\") (not fill(\"Problem statement\", \"Connectivity issue with a hardware device categorized under software\")).\n13. For reference fields on create forms, type the shortest distinctive prefix needed to trigger the intended suggestion rather than the full entity name. Example: for goal 'Create a change request to transfer Oracle database support activities to a specialized group.', after click(\"Assignment group\"), the correct next action is fill(\"Assignment group\", \"Databas\") (not fill(\"Assignment group\", \"Oracle\")).\n14. On change request forms, if a visible field is prefilled or auto-generated, skip clicking it first and begin with the first empty required field that needs user input. Example: for goal 'Create a change request to upgrade a server system and validate connectivity.', after no prior actions, the correct next action is click(\"Number\") (not click(\"Justification\")).\n15. For change request creation tasks that specify only choice attributes first, start by setting the first requested dropdown field before any text area. Example: for goal 'Create a change request with specified impact, risk, category, and justification details.', after no prior actions, the correct next action is select_option(\"Impact\", \"3 - Low\") (not click(\"Justification\")).\n16. When a change request text area is focused, enter the exact provided content for that field, even if it is opaque or nonsensical, rather than a cleaned-up summary. Example: for goal 'Create a change request for adding a network switch to a cabinet.', after click(\"Justification\"), the correct next action is fill(\"Justification\", \"fluozirconic compenser playfellow stirrupless used\") (not fill(\"Justification\", \"Adding a network switch to a cabinet\")).\n17. For change request creation, do not assume Justification is the first field; if the task includes planning fields, start with the earliest such field visible on the form. Example: for goal 'Create a change request to add redundant name servers to multiple Linux servers.', after no prior actions, the correct next action is click(\"Backout plan\") (not click(\"Justification\")).\n18. For problem record creation, after focusing Problem statement, fill it with the exact issue text from the task's underlying report, not a generic connectivity paraphrase. Example: for goal 'Create a problem record for a hardware connectivity issue.', after click(\"Problem statement\"), the correct next action is fill(\"Problem statement\", \"Cannot disable wireless when plug into an Ethernet port\") (not fill(\"Problem statement\", \"Issue in connecting to internet using modem.\")).\n19. For incident creation, after focusing Short description, enter the precise reported symptom text and keep separate metadata like channel or priority out of the description unless explicitly part of it. Example: for goal 'Create a high-priority incident record for a storage capacity issue reported by phone.', after click(\"Short description\"), the correct next action is fill(\"Short description\", \"File Server is 80% full - Needs upgrade\") (not fill(\"Short description\", \"Storage capacity issue reported by phone\")).\n20. In hardware asset creation, after completing Model category, Model, and Vendor, move next to identifier text fields like Serial number before Asset tag or later choice fields when those identifiers are still empty. Example: for goal 'Create a compute hardware asset record with rental acquisition and shared function.', after fill(\"Model category\", \"Computer\"), click(\"nth=0\"), click(\"Model\"), fill(\"Model\", \"Apple MacBook Pro 16\"), click(\"nth=0\"), click(\"Vendor\"), fill(\"Vendor\", \"Appl\"), click(\"nth=0\"), the correct next action is click(\"Serial number\") (not select_option(\"Asset function\", \"Shared\n21. For hardware change request creation, when the request targets a specific device upgrade, begin with the Configuration item reference rather than assignment fields. Example: for goal 'Create a hardware change request for a server storage upgrade.', after no prior actions, the correct next action is click(\"Configuration item\") (not click(\"Assignment group\")).\n22. For change request creation, if the task specifies Impact/Risk/category choice fields up front, set the earliest requested dropdown first rather than opening a text area. Example: for goal 'Create a change request to modify network configuration for redundancy.', after no prior actions, the correct next action is select_option(\"Impact\", \"2 - Medium\") (not click(\"Justification\")).\n23. When a person reference field is focused on a create form, fill it with the exact named person from the task, not a role or generic user label. Example: for goal 'Create an incident record for a software issue with SAP Materials Management.', after click(\"Short description\"), fill(\"Short description\", \"SAP Materials Management software issue\"), click(\"Caller\"), the correct next action is fill(\"Caller\", \"Christen Mitchel\") (not fill(\"Caller\", \"System Administrator\")).\n24. For problem record creation, after focusing Problem statement, enter the exact reported symptom text from the task's source issue, not the category, priority, or a reused phrase from another example. Example: for goal 'Create a problem record for a hardware connectivity issue with low priority.', after click(\"Problem statement\"), the correct next action is fill(\"Problem statement\", \"USB port has stopped working\") (not fill(\"Problem statement\", \"Cannot disable wireless when plug into an Ethernet port\")).\n25. For incident creation, after focusing Short description, use the underlying user-reported symptom verbatim rather than a broad issue summary or workaround description. Example: for goal 'Create an incident record for a performance issue with a workaround resolution via email.', after click(\"Short description\"), the correct next action is fill(\"Short description\", \"CPU load high for over 10 minutes\") (not fill(\"Short description\", \"System performance is degraded. Workaround provided via email.\")).\n26. For incident creation, after focusing Short description, copy the exact incident summary from the task's source record, even if it is terse, coded, or differs from the goal wording. Example: for goal 'Create an incident record with inquiry details and a known error resolution.', after click(\"Short description\"), the correct next action is fill(\"Short description\", \"ATF : Test1\") (not fill(\"Short description\", \"Inquiry details\")).\n27. For incident creation, do not reuse symptom text from another example or related task; fill Short description with the specific issue named in the current request. Example: for goal 'Create an incident record for a hardware resource issue.', after click(\"Short description\"), the correct next action is fill(\"Short description\", \"Need to add more memory to laptop\") (not fill(\"Short description\", \"USB port has stopped working\")).\n28. On change request forms, after filling the first text field, continue to the next required field in form order, which may be another text area such as risk analysis before implementation details. Example: for goal 'Create a change request for adding a network switch to a cabinet.', after click(\"Justification\"), fill(\"Justification\", \"fluozirconic compenser playfellow stirrupless used\"), the correct next action is click(\"Risk and impact analy\") (not click(\"Implementation plan\")).\n29. For problem record creation, after filling Problem statement, continue with the next core form field in order before setting later metadata like urgency; prefer linked service/context fields first when present. Example: for goal 'Create a low-urgency network problem record for a connectivity issue.', after click(\"Problem statement\"), fill(\"Problem statement\", \"Issue in connecting to internet using modem.\"), the correct next action is click(\"Service\") (not select_option(\"Urgency\", \"3 - Low\")).\n30. For problem record creation, after focusing Problem statement, enter the exact storage or capacity issue title from the source report, not a generic restatement of the affected system's condition. Example: for goal 'Create a problem record for a hardware-related storage capacity issue on a file server.', after click(\"Problem statement\"), the correct next action is fill(\"Problem statement\", \"2nd Floor File Server Short on Space\") (not fill(\"Problem statement\", \"File Server is 80% full - Needs upgrade\")).\n31. On change request creation, if the form begins with empty service-related reference fields, start with the earliest visible one before setting requested risk or impact dropdowns. Example: for goal 'Create a change request with specified risk, impact, backout plan, test plan, configuration item, and close note.', after no prior actions, the correct next action is click(\"Service offering\") (not select_option(\"Risk\", \"Moderate\")).\n32. On change request creation, if the form starts with core service/context references, begin with the earliest visible one rather than assignment fields. Example: for goal 'Create a change request to evaluate switching to Linux desktops.', after no prior actions, the correct next action is click(\"Service\") (not click(\"Assignment group\")).\n33. For problem record creation, after focusing Problem statement, copy the exact source symptom text even when the goal only gives a broad hardware/printing summary. Example: for goal 'Create a new problem record documenting a printing-related hardware issue with low priority.', after click(\"Problem statement\"), the correct next action is fill(\"Problem statement\", \"Hang when trying to print VISIO document\") (not fill(\"Problem statement\", \"Printer is not printing due to hardware issue\")).\n34. For incident creation, after focusing Short description, enter the full task-provided application/system outage wording, including the specific product name, rather than a generic failure summary. Example: for goal 'Create an incident record for a software application failure with high priority.', after click(\"Short description\"), the correct next action is fill(\"Short description\", \"SAP Financial Accounting application appears to be down\") (not fill(\"Short description\", \"Application is not working\")).\n35. When a create-form field is focused and the task supplies a concrete identifier or model value, fill that exact value instead of reusing a common value from another example. Example: for goal 'Create a new hardware asset record with configuration and assignment details.', after click(\"Model category\"), fill(\"Model category\", \"Computer\"), click(\"nth=0\"), click(\"Model\"), the correct next action is fill(\"Model\", \"Lenovo ThinkStation S2\") (not fill(\"Model\", \"Apple MacBook Pro 16\")).\n36. When an identifier text field is focused during record creation, populate it with the exact provided identifier string; do not leave it blank unless the task explicitly gives an empty value. Example: for goal 'Create a compute hardware asset record with specified attributes and assignment details.', after click(\"nth=0\"), click(\"Model\"), fill(\"Model\", \"Apple MacBook Pro 16\"), click(\"nth=0\"), click(\"Vendor\"), fill(\"Vendor\", \"Appl\"), click(\"nth=0\"), click(\"Serial number\"), the correct next action is fill(\"Serial number\", \"SN-440af7d2-06ad-485a-9f4b-7df0e26a8481\") (not fill(\"Serial number\", \"\")).\n37. On change request forms, after completing Assignment group, continue to the next requested infrastructure/context reference field in form order before moving to narrative fields. Example: for goal 'Create a change request to transition support group for Oracle CIs to Database group.', after click(\"Assignment group\"), fill(\"Assignment group\", \"Databas\"), click(\"nth=0\"), the correct next action is click(\"Configuration item\") (not click(\"Short description\")).\n38. When a field is intentionally empty in the task data, fill it with an empty string rather than inventing a plausible category or owner. Example: for goal 'Create a problem record for a hardware connectivity issue with low priority.', after click(\"Problem statement\"), fill(\"Problem statement\", \"USB port has stopped working\"), click(\"Service\"), the correct next action is fill(\"Service\", \"\") (not fill(\"Service\", \"Hardware\")).\n39. On change request forms, if Close code is one of the specified fields and no prior actions have been taken or only an early dropdown is set, prioritize setting Close code before moving to service, risk, or narrative fields. Example: for goal 'Create a change request for a network configuration update on a Linux server.', after no prior actions, the correct next action is select_option(\"Close code\", \"Successful with issues\") (not click(\"Service\")).\n40. On change request forms, after completing the first requested dropdown, move to the next explicitly provided close-related field if present, even if other standard fields like Risk remain unset. Example: for goal 'Create a change request to modify network configuration for redundancy.', after select_option(\"Impact\", \"2 - Medium\"), the correct next action is click(\"Close note\") (not select_option(\"Risk\", \"Moderate\")).\n41. For problem record creation, after filling Problem statement, if the task specifies both Service and Configuration item and the next expected field is the CI reference, go to Configuration item before Service. Example: for goal 'Create a problem record for a connectivity issue with a hardware device categorized under software.', after click(\"Problem statement\"), fill(\"Problem statement\", \"Issue in connecting to internet using modem.\"), the correct next action is click(\"Configuration item\") (not click(\"Service\")).\n42. When a create-form field is focused for a model/reference value, enter the exact task-provided value for the current record and do not reuse a frequent model from another asset example. Example: for goal 'Create a new compute hardware asset record with financial and ownership details.', after click(\"Model category\"), fill(\"Model category\", \"Computer\"), click(\"nth=0\"), click(\"Model\"), the correct next action is fill(\"Model\", \"Sony VAIO VPCSA3AG\") (not fill(\"Model\", \"Apple MacBook Pro 16\")).\n43. After filling Problem statement on a problem form, prefer the next requested severity/impact dropdown when present before jumping to service or configuration references. Example: for goal 'Create a problem record for a connectivity issue with a hardware device.', after click(\"Problem statement\"), fill(\"Problem statement\", \"Issue in connecting to internet using modem.\"), the correct next action is select_option(\"Impact\", \"3 - Low\") (not click(\"Configuration item\")).\n44. For problem record creation, after focusing Problem statement, copy the exact source issue text rather than a generic restatement of the goal, including specific product names or symptoms. Example: for goal 'Create a problem record for a database performance issue.', after click(\"Problem statement\"), the correct next action is fill(\"Problem statement\", \"Lawson DB seems to be running slowly\") (not fill(\"Problem statement\", \"Database performance issue\")).\n45. When an identifier field like Serial number is focused during record creation, fill it with the exact identifier from the current task and never reuse an identifier from a prior asset example. Example: for goal 'Create a shared compute hardware asset record for a specific device.', after click(\"nth=0\"), click(\"Model\"), fill(\"Model\", \"Apple MacBook Pro 16\"), click(\"nth=0\"), click(\"Vendor\"), fill(\"Vendor\", \"Appl\"), click(\"nth=0\"), click(\"Serial number\"), the correct next action is fill(\"Serial number\", \"SN-2b0cc82c-9485-4915-8e79-edc87907e94a\") (not fill(\"Serial number\", \"SN-440af7d2-06ad-485a-9\n46. In incident creation, after filling Short description, move to the next core reference field in form order such as Caller before setting derived metadata like Priority, even if the goal mentions urgency. Example: for goal 'Create a high-priority incident record for a storage capacity issue reported by phone.', after click(\"Short description\"), fill(\"Short description\", \"File Server is 80% full - Needs upgrade\"), the correct next action is click(\"Caller\") (not select_option(\"Priority\", \"1 - Critical\")).\n47. For problem record creation, after filling Problem statement, follow the next explicitly requested form field from the task; do not default to Impact/Urgency if another field comes next in form order. Example: for goal 'Create a low-priority hardware problem record for a storage capacity issue.', after click(\"Problem statement\"), fill(\"Problem statement\", \"2nd Floor File Server Short on Space\"), the correct next action is click(\"Assignment group\") (not select_option(\"Impact\", \"3 - Low\")).\n48. For problem record creation, when the task specifies low priority and the next field to set is the priority-like dropdown, choose Urgency rather than Impact if Urgency is the requested field on the form. Example: for goal 'Create a new problem record documenting a printing-related hardware issue with low priority.', after click(\"Problem statement\"), fill(\"Problem statement\", \"Hang when trying to print VISIO document\"), the correct next action is select_option(\"Urgency\", \"3 - Low\") (not select_option(\"Impact\", \"3 - Low\")).\n49. When a model reference field is focused during hardware asset creation, fill it with the exact model named in the current task and do not substitute a frequent nearby model from another asset example. Example: for goal 'Create a compute hardware asset record with acquisition and disposal details.', after click(\"Model category\"), fill(\"Model category\", \"Computer\"), click(\"nth=0\"), click(\"Model\"), the correct next action is fill(\"Model\", \"Gateway DX Serie\") (not fill(\"Model\", \"Apple MacBook Pro 16\")).\n50. When a person reference field such as Caller is focused on an incident form, enter the exact named person from the task's source record, not a role label or generic requester. Example: for goal 'Create an incident record for a software application failure with high priority.', after click(\"Short description\"), fill(\"Short description\", \"SAP Financial Accounting application appears to be down\"), click(\"Caller\"), the correct next action is fill(\"Caller\", \"Bud Richma\") (not fill(\"Caller\", \"System Administrator\")).\n51. For change request creation, when the task is a general request with specified risk/impact and no service or CI is mentioned, start with Short description rather than service-related references. Example: for goal 'Create a change request for a database upgrade with specified risk, impact, and backout plan.', after no prior actions, the correct next action is click(\"Short description\") (not click(\"Service offering\")).\n52. When a model reference field is focused during hardware asset creation, enter the exact model named in the current task and do not substitute another frequent model from prior examples. Example: for goal 'Create a compute hardware asset record with associated financial and disposal details.', after click(\"Model category\"), fill(\"Model category\", \"Computer\"), click(\"nth=0\"), click(\"Model\"), the correct next action is fill(\"Model\", \"Apple MacBook Air 13\") (not fill(\"Model\", \"Sony VAIO VPCSA3AG\")).\n53. For problem record creation, after focusing Problem statement, enter the exact source issue title, even if it is much shorter than the goal's description or omits requested follow-up work. Example: for goal 'Create a problem record for a software-related email outage requiring root cause analysis.', after click(\"Problem statement\"), the correct next action is fill(\"Problem statement\", \"Email down\") (not fill(\"Problem statement\", \"Email outage requiring root cause analysis\")).\n54. When Serial number is focused during hardware asset creation, fill it with the exact identifier from the current task and never reuse a serial from another asset example. Example: for goal 'Create a new hardware asset record with specified attributes and assignments.', after click(\"nth=0\"), click(\"Model\"), fill(\"Model\", \"Apple MacBook Pro 16\"), click(\"nth=0\"), click(\"Vendor\"), fill(\"Vendor\", \"Appl\"), click(\"nth=0\"), click(\"Serial number\"), the correct next action is fill(\"Serial number\", \"SN-b6f288d9-f749-495d-96e0-e9e52b34ca5b\") (not fill(\"Serial number\", \"SN-440af7d2-06ad-485a-9f4b-7df0e26a8\n55. On change request forms, when a text area is focused, fill it with the exact provided content for that field and do not reuse another opaque text from the same form or a prior example. Example: for goal 'Create a change request for adding a network switch to a cabinet.', after click(\"Justification\"), fill(\"Justification\", \"fluozirconic compenser playfellow stirrupless used\"), click(\"Risk and impact analy\"), the correct next action is fill(\"Risk and impact analy\", \"acrologism uncalculating oxalylurea raucous hiveward\") (not fill(\"Risk and impact analy\", \"sulphinyl underlinen untendered overtaxe\n56. For problem record creation, after setting Impact, if the task also specifies low priority and Urgency is the next priority-like field, set Urgency next before moving to references such as Configuration item. Example: for goal 'Create a problem record for a connectivity issue with a hardware device.', after click(\"Problem statement\"), fill(\"Problem statement\", \"Issue in connecting to internet using modem.\"), select_option(\"Impact\", \"3 - Low\"), the correct next action is select_option(\"Urgency\", \"3 - Low\") (not click(\"Configuration item\")).\n\n### Workflows\n\nWorkflow: create_record\nDescription: Use this to create a new record by entering provided field values on a form and submitting it.\n1. for each text field <FIELD> with value <VALUE>, click(\"<FIELD>\")  # e.g. \"Test plan\", \"Number\", \"Description\"\n2. for each text field <FIELD> with value <VALUE>, fill(\"<FIELD>\", \"<VALUE>\")  # e.g. \"CHG0000028\", \"\"\n3. for each reference field <FIELD> with value <VALUE>, click(\"<FIELD>\")  # e.g. \"Configuration item\", \"Assignment group\"\n4. for each reference field <FIELD> with value <VALUE>, fill(\"<FIELD>\", \"<VALUE>\")  # e.g. partial value like \"PS LinuxApp0\", \"Networ\"\n5. for each reference field <FIELD> with value <VALUE>, click(\"nth=0\")\n6. for each choice field <FIELD> with value <VALUE>, select_option(\"<FIELD>\", \"<VALUE>\")  # e.g. \"Impact\" -> \"3 - Low\", \"Risk\" -> \"Moderate\"\n7. click(\"#sysverb_insert\")\n\nWorkflow: create_record_with_reference_and_optional_fields\nDescription: Use this to create a new record by populating core reference fields, adding any extra fields, and submitting the form.\n1. click(\"<REFERENCE_FIELD>\") # example: Model category, Model, Vendor\n2. fill(\"<REFERENCE_FIELD>\", \"<VALUE_PREFIX>\") # example: Compute, Apple MacBook Air 13, Appl\n3. click(\"nth=0\")\n4. for each additional field <FIELD> with value <VALUE>: click(\"<FIELD>\") # example: Serial number, Cost center, Location, Asset tag\n5. for each additional text field <FIELD> with value <VALUE>: fill(\"<FIELD>\", \"<VALUE>\") # example: SN-1037..., INV0166221, P1000191, empty string\n6. for each additional reference field <FIELD> with value prefix <VALUE_PREFIX>: click(\"nth=0\") # example after filling Cost center, Location, Assigned to, Depreciation\n7. for each choice field <FIELD> with value <VALUE>: select_option(\"<FIELD>\", \"<VALUE>\") # example: Asset function=Primary, Expenditure type=Capex, Acquisition method=Loan\n8. click(\"#sysverb_insert\")\n\nWorkflow: search_global_knowledge\nDescription: Use when answering a question via the global search box. Preconditions: a page with the global Search input is visible. Enter the query and open the first result. Outcome: the first matching result page is opened.\n1. fill('Search', <QUERY>)  # e.g. '\"company\\'s stock ticker symbol\"', '\"Wi-Fi network name in the lobby\"'\n2. click('nth=0')\n\nWorkflow: apply_filter\nDescription: Use this to filter a list by one or more conditions joined with connectors.\n1. click(\".list_filter_toggle\")\n2. for the first condition, select_option(\"nth=0\", \"<FIELD>\") and select_option(\"nth=0\", \"<OPERATOR>\") # e.g. asset_tag, company, install_status; =\n3. if the first condition has a non-empty value, select_option(\"nth=0\", \"<VALUE>\") # e.g. Missing, Retired, Primary\n4. for each additional condition, click(\".filterToolbar .filerTableAction:text-is(\\\"<CONNECTOR>\\\")\") then select_option(\"nth=<INDEX>\", \"<FIELD>\") and select_option(\"nth=<INDEX>\", \"<OPERATOR>\") # e.g. AND\n5. for each additional condition with a non-empty value, select_option(\"nth=<INDEX>\", \"<VALUE>\") # e.g. Primary, Retired\n6. click(\"Run\")\n\nWorkflow: sort_list\nDescription: Use when a ServiceNow list must be ordered by one or more fields. Preconditions: the target list is visible. Open the list builder, add one sort row per requested field, and set each row's direction. Outcome: the visible records are ordered by the configured sort levels.\n1. click('.list_filter_toggle')\n2. click('role=button')  # add a sort row\n3. select_option(<SORT_ROW>, <FIELD>)  # e.g. 'nth=1', 'Assigned'\n4. select_option(<SORT_ROW>, <DIRECTION>)  # e.g. 'nth=1', 'ascending'\n5. Repeat steps 2-4 for each additional sort level  # e.g. 'Department', 'descending'\n6. click('Run filter')\n\n", "gpt|l2": "### Skill\n\n1. When a task has no prior actions and no page evidence is available, begin by opening the application navigator instead of waiting. Example: for goal 'workarena.servicenow.priority-assignment-small-l2', after no prior actions, the correct next action is click('All') (not noop(1000)).\n2. Start list-based ServiceNow tasks by opening the All menu to reach the needed module before filtering, sorting, updating, or selecting records. Example: for goal 'workarena.servicenow.two-changes-fix-tight-uniform-risk-change-request-scheduling-l2', after no prior actions, the correct next action is click('All') (not noop(1000)).\n3. After opening the application navigator with click('All'), immediately type the target module/application name into the All menu filter rather than waiting. Example: for goal 'workarena.servicenow.filter-single-item-uniform-expenses-and-delete-wrong-investments-small-l2', after click(\"All\"), the correct next action is fill('All menu | placeholder=\"Filter\"', 'Cost') (not noop(1000)).\n4. Infer the module from the task family before searching the All menu: expense, investment, and return-analysis tasks go to Cost; change-request scheduling tasks go to Change. Example: for goal 'workarena.servicenow.filter-random-expenses-and-select-investments-small-l2', after click(\"All\"), the correct next action is fill('All menu | placeholder=\"Filter\"', 'Cost') (not fill(\"All menu | placeholder=\\\"Filter\\\"\", \"Change\")).\n\n### Workflows\n\nWorkflow: filter_list\nDescription: Use when a ServiceNow list must be narrowed to records matching one condition. Preconditions: the user can access the target module from the All menu. Outcome: the target list is opened and filtered by the specified field, operator, and value.\n1. click('All')\n2. fill('All menu | placeholder=\"Filter\"', <LIST_NAME>)  # e.g. 'Cost', 'Change', 'Service Desk'\n3. click('All menu | role=button | <LIST_NAME>')\n4. click('.list_filter_toggle')\n5. select_option('nth=0', <FIELD>)  # e.g. 'short_description', 'number'\n6. select_option('nth=0', <OPERATOR>)  # e.g. 'LIKE', '='\n7. click('nth=0')\n8. fill('nth=0', <VALUE>)  # e.g. '#SERIES-cea4ce69-0', 'PAS0631939'\n9. click('Run')\n\nWorkflow: delete_filtered_records_from_list\nDescription: Use when records in a list have already been filtered and each matching record should be deleted one by one from its preview. Preconditions: a filtered list is visible and matching rows are present. Outcome: each targeted record is opened from preview and deleted.\n1. click('Preview record: <RECORD_ID>')  # e.g. 'EXP-02714422093', 'EXP-14e3ed903-4'\n2. click('Open Record')\n3. click('delete | nth=0')\n4. Repeat steps 1-3 for each additional matching record  # e.g. multiple Expense Line records in Cost\n\nWorkflow: sort_list\nDescription: Use when a ServiceNow list must be ordered by one or more fields. Preconditions: the target list is visible. Outcome: the list is sorted by the specified sort levels and directions.\n1. click('.list_filter_toggle')\n2. click('role=button')  # add a sort row\n3. select_option(<SORT_ROW>, <FIELD>)  # e.g. 'nth=1', 'Middle name'\n4. select_option(<SORT_ROW>, <DIRECTION>)  # e.g. 'nth=1', 'ascending'\n5. Repeat steps 2-4 for each additional sort level  # e.g. 'Failed login attempts' descending, 'First name' descending\n6. click('Run filter')\n\nWorkflow: build_or_filter\nDescription: Use when a list must be filtered by multiple alternative conditions joined with OR. Preconditions: the target list is open and the filter builder is available. Outcome: the list shows records matching any of the specified conditions.\n1. click('All')\n2. fill('All menu | placeholder=\"Filter\"', <LIST_NAME>)  # e.g. 'Change'\n3. click('All menu | role=button | <LIST_NAME>')\n4. click('.list_filter_toggle')\n5. select_option('nth=0', <FIELD_1>)  # e.g. 'assignment_group'\n6. select_option('nth=0', <OPERATOR_1>)  # e.g. '='\n7. click('nth=0')\n8. fill('nth=0', <VALUE_1>)  # e.g. 'Networ'\n9. click('nth=0')\n10. click('.filterToolbar .filerTableAction:text-is(\"OR\")')\n11. select_option('nth=1', <FIELD_2>)  # e.g. 'chg_model'\n12. select_option('nth=1', <OPERATOR_2>)  # e.g. '='\n13. Optional: click('nth=1') and fill('nth=1', <VALUE_2>) if the second condition needs a value\n14. click('.filterToolbar .filerTableAction:text-is(\"OR\")')\n15. select_option('nth=2', <FIELD_3>)  # e.g. 'assigned_to'\n16. select_option('nth=2', <OPERATOR_3>)  # e.g. '='\n17. click('nth=2')\n18. fill('nth=2', <VALUE_3>)  # e.g. 'David Lo'\n19. click('nth=0')\n20. click('Run')\n\nWorkflow: update_record_field_by_number\nDescription: Use when a specific record in a list must be found by exact number, opened, one field updated, and then saved. Preconditions: the target module is accessible and the record number is known. Outcome: the selected record is updated with the new field value.\n1. click('All')\n2. fill('All menu | placeholder=\"Filter\"', <LIST_NAME>)  # e.g. 'Service Desk'\n3. click('All menu | role=button | <LIST_NAME>')\n4. click('.list_filter_toggle')\n5. select_option('nth=0', 'number')\n6. select_option('nth=0', '=')\n7. click('nth=0')\n8. fill('nth=0', <RECORD_NUMBER>)  # e.g. 'PAS0631939', 'WAM7027657'\n9. click('Run')\n10. click('role=button | nth=0')\n11. click('Open Record')\n12. click('<FIELD_LABEL> | nth=0')  # e.g. 'Assigned to'\n13. fill('<FIELD_LABEL> | nth=0', <NEW_VALUE>)  # e.g. assignee name\n14. click('nth=0')\n15. click('iframe[name=\"gsft_main\"] >> internal:control=enter-frame >> #sysverb_update')\n\nWorkflow: update_change_schedule_by_series\nDescription: Use when a set of Change records sharing a short-description pattern must be found and each record’s planned start and planned end dates updated. Preconditions: the Change list is accessible and the identifying series text is known. Outcome: each targeted Change record is opened, its schedule fields are updated, and the record is saved.\n1. click('All')\n2. fill('All menu | placeholder=\"Filter\"', 'Change')\n3. click('All menu | role=button | Change')\n4. click('.list_filter_toggle')\n5. select_option('nth=0', 'short_description')\n6. select_option('nth=0', 'LIKE')\n7. click('nth=0')\n8. fill('nth=0', <SERIES_TEXT>)  # e.g. '#SERIES-28c32f2e-d'\n9. click('Run')\n10. click('Preview record: <CHANGE_NUMBER>')  # e.g. 'CHG0047663'\n11. click('Open Record')\n12. click('Planned start date | nth=0')\n13. fill('Planned start date | nth=0', <PLANNED_START>)  # e.g. '2026-07-06 10:35:33'\n14. click('Planned end date | nth=0')\n15. fill('Planned end date | nth=0', <PLANNED_END>)  # e.g. '2026-07-07 10:35:33'\n16. click('iframe[name=\"gsft_main\"] >> internal:control=enter-frame >> #sysverb_update')\n17. Repeat steps 10-16 for each additional matching Change record  # e.g. CHG0047664, CHG0047665\n\nWorkflow: apply_list_filter\nDescription: Use this to filter a ServiceNow list by one or more field conditions.\n1. click('All')  # open the application navigator\n2. fill('All menu | placeholder=\"Filter\"', '<APPLICATION>')  # example: Cost\n3. click('All menu | role=button | <APPLICATION>')  # example: Cost\n4. click('.list_filter_toggle')  # open the list filter builder\n5. for each condition, select_option('nth=<CONDITION_INDEX>', '<FIELD>')  # example: short_description\n6. for each condition, select_option('nth=<CONDITION_INDEX>', '<OPERATOR>')  # example: LIKE\n7. for each condition, click('nth=<CONDITION_INDEX>')  # focus the value input\n8. for each condition, fill('nth=<CONDITION_INDEX>', '<VALUE>')  # example: #1f2e340a-7\n9. click('Run')\n\nWorkflow: delete_filtered_records\nDescription: Use this to remove one or more records from a list after narrowing the list with a single filter condition.\n1. click('.list_filter_toggle')\n2. select_option('nth=0', '<FIELD>') # example: short_description\n3. select_option('nth=0', '<OPERATOR>') # example: LIKE\n4. click('nth=0')\n5. fill('nth=0', '<VALUE>') # example: #f219f65c-4\n6. click('Run')\n7. for each record to delete: click('Preview record: <RECORD>')\n8. for each record to delete: click('Open Record')\n9. for each record to delete: click('delete | nth=0')\n\nWorkflow: update_record_date_fields\nDescription: Use this to open each filtered record from a list and update its planned start and end dates.\n1. click('Preview record: <RECORD>')  # example: CHG0048096\n2. click('Open Record')\n3. click('<START_DATE_FIELD> | nth=0')  # example: Planned start date\n4. fill('<START_DATE_FIELD> | nth=0', '<START_DATE_TIME>')  # example: 2028-10-01 06:24:46\n5. click('<END_DATE_FIELD> | nth=0')  # example: Planned end date\n6. fill('<END_DATE_FIELD> | nth=0', '<END_DATE_TIME>')  # example: 2028-10-03 06:24:46\n7. click('iframe[name=\"gsft_main\"] >> internal:control=enter-frame >> #sysverb_update')\n8. for each remaining record, repeat steps 1-7 with its <RECORD>, <START_DATE_TIME>, and <END_DATE_TIME>\n\n", "gpt|m2w": "### Skill\n\n1. When a travel or booking form shows empty labeled fields or collapsed selectors, open the control before typing or choosing values; do not skip directly to filling hidden inputs. Example: for goal 'Find train options from New York, NY - Moynihan Train Hall (NYP) to Washington, DC - Union Station (WAS) for the 15th.', after no prior actions, the correct next action is click(\"From\") (not fill(\"From\", \"New York, NY - Moynihan Train Hall (NYP)\")).\n2. On search/listing pages, satisfy explicit item-condition constraints before secondary perks like shipping, especially when the current results visibly violate the requested condition. Example: for goal 'Find new laptops priced between $400 and $500 with free shipping.', after fill(\"Search for anything\", \"new laptop\") and click(\"Search\"), the correct next action is click(\"New\") (not click(\"Free shipping\")).\n3. Prefer stable navigation or mode controls over content shortcuts when the goal requires changing site context and the page offers a dedicated section/tab for that context. Example: for goal 'Browse museums in New York City.', after no prior actions, the correct next action is click(\"Cities\") (not click(\"New York City\")).\n4. When a page shows broad department, section, or mode tabs alongside matching subitems, enter the parent container first before choosing a specific item or filter within it. Example: for goal 'Browse the Wine department with Kroger delivery available by 8:00pm.', after click(\"\"), the correct next action is click(\"Departments\") (not click(\"Wine\")).\n5. Prefer click on visible tabs, chips, or pseudo-checkbox labels to activate a filter when the control is presented as a clickable text/value element rather than a standard checkbox input. Example: for goal 'View the Coupons & Deals section filtered to LTO offers.', after click(\"Coupons & Deals\"), the correct next action is click(\"LTO\") (not set_checked(\"LTO\", \"true\")).\n6. When the goal combines a search target with a specific search mode or product type, choose the mode tab that matches the requested service before opening broader category pages or destination-specific shortcuts. Example: for goal 'Book hourly parking at Atlanta International Airport on Spine Road in College Park, Georgia.', after no prior actions, the correct next action is click(\"Hourly\") (not click(\"Airport\")).\n7. When the goal names a specific entity but the landing page only shows broad site sections or a search box, start with the site's search control instead of a top-level category or guessed result. Example: for goal 'Save Atlantis to a collection.', after no prior actions, the correct next action is fill(\"Search\", \"Atlantis\") (not click(\"Atlantis\")).\n8. When a date or text field is visibly an input or picker trigger, click it to open/focus the control before typing or selecting a value; do not type into unopened widgets or use select_option on non-dropdown toggles. Example: for goal 'Find hotel options for 1 room for 2 adults and 1 child age 0, staying from the 24th to the 27th, with price range and area filters applied.', after click(\"hotels.\"), the correct next action is click(\"checkin\") (not fill(\"Check In\", \"24\")).\n9. After selecting an item in a date-filtered planner, if a visible current date chip/value is shown next to a date picker, click that existing date value to open or change the date instead of typing a new date into the picker label. Example: for goal 'View the planned service changes for Route 4 on Wednesday, May 3, 2023.', after click(\"\"), click(\"Planned Service Changes\"), fill(\"Search Routes\", \"4\"), and click(\"4\"), the correct next action is click(\"04/12/2023\") (not fill(\"Select Date\", \"05/03/2023\")).\n\n### Workflows\n\nWorkflow: complete_contact_or_request_form\nDescription: Use when a site presents a lead, inquiry, rental, demo-drive, or checkout-gating form that asks for personal/contact details before continuing. Preconditions: the relevant form is already open. Outcome: required identity/contact fields are filled and the form is submitted or advanced.\n1. fill(<NAME_OR_CONTACT_FIELD>, <VALUE>)  # e.g. \"First Name\", \"lastName\", \"Email Address *\", \"phone\", \"zip\"\n2. fill(<ADDITIONAL_REQUIRED_FIELD>, <VALUE>)  # e.g. address, city, employer, member number, market, message\n3. select_option(<OPTION_FIELD>, <OPTION>)  # if present; e.g. state, market\n4. click(<SUBMIT_CONTROL>)  # e.g. \"Submit\", \"Submit and Continue\", \"Sign Up\", \"Proceed to checkout\", \"Send Email\"\n\nWorkflow: search_location_then_choose_suggestion\nDescription: Use when a site requires typing a place, venue, airport, park, city, destination, or station and then selecting one autocomplete suggestion before proceeding. Preconditions: a searchable location input is visible. Outcome: the intended location is selected into the form or search flow.\n1. fill(<LOCATION_FIELD>, <QUERY>)  # e.g. \"City or airport\", \"Where are you going?\", \"Select a park\", \"Departure station...\"\n2. click(<SUGGESTED_LOCATION>)  # e.g. \"SFO - San Francisco International, CA\", \"Alagnak Wild River\", \"Los Angeles, CA, USA\"\n\nWorkflow: navigate_to_section_then_open_subpage\nDescription: Use when you need to reach a topic/category section and then open a related destination within it.\n1. click(\"<SECTION>\")          # example: \"Music\", \"News\", \"Fantasy\", \"NFL\", \"Watchlist 5\"\n2. click(\"<DESTINATION>\")      # example: \"Follow\", \"View All\", \"Download the App .\", \"Edit\", \"VIDEOS\", \"What to Watch\"\n\nWorkflow: configure_travel_party\nDescription: Use when a booking flow asks for traveler or guest counts, room counts, or passenger composition before search. Preconditions: the occupancy/traveler selector is open or accessible. Outcome: the party composition is set.\n1. click(<PARTY_CONTROL>)  # e.g. \"1 traveler\", \"1 room, 2 guests\", \"Number of Guests\"\n2. click(<INCREMENT_OR_ADD_CONTROL>)  # e.g. \"Increase adults\", \"Add Adults\", \"Add Rooms\"\n3. select_option(<AGE_OR_COUNT_FIELD>, <OPTION>)  # if present; e.g. child age, total passengers\n4. click(<DONE_CONTROL>)  # e.g. \"Done\", \"Confirm\"\n\nWorkflow: search_after_form_setup\nDescription: Use when a site requires entering search criteria and then explicitly launching results. Preconditions: required search inputs have been populated. Outcome: the site navigates to a results page.\n1. fill(<SEARCH_FIELD>, <QUERY>)  # e.g. \"Search\", \"Search Site\", \"Search for anything\", \"Airport\"\n2. click(<SEARCH_TRIGGER>)  # e.g. \"Search\", \"Find\", \"Submit Search\", \"Get cheapest tickets\"\n\nWorkflow: browse_category_hierarchy\nDescription: Use when reaching the target content requires drilling down through two or more navigation levels such as department → subcategory → sub-subcategory. Preconditions: top-level navigation is accessible. Outcome: the agent lands on a focused listing or section.\n1. click(<TOP_LEVEL_CATEGORY>)  # e.g. \"WOMEN\", \"Sports\", \"Movies\", \"Shop\"\n2. click(<SUBCATEGORY>)  # e.g. \"Cropped Tops\", \"NFL\", \"In Theaters\", \"Vitamin C\"\n3. click(<DEEPER_CATEGORY_OR_SECTION>)  # e.g. \"All NFL Tickets\", \"Coming Soon\", \"Shirts and Hoodies\"\n\nWorkflow: apply_filters_to_results\nDescription: Use when a results or listing page offers one or more facet filters such as size, color, amenities, genre, stock, cancellation, stops, or accessibility. Preconditions: a results page or filter panel is open. Outcome: results are narrowed to match requested constraints.\n1. click(<FILTER_GROUP>)  # e.g. \"Genre\", \"Color\", \"Amenities\", \"Filter\", \"Size\"\n2. click(<FILTER_OPTION>)  # e.g. \"comedy\", \"BLACK\", \"Business center (11)\", \"wheelchair\"\n3. click(<APPLY_OR_SHOW_RESULTS_CONTROL>)  # if present; e.g. \"Apply\", \"Show 10 Results\", \"Done\"\n\nWorkflow: sort_results\nDescription: Use when a listing page supports changing result order after search or filtering. Preconditions: sortable results are visible. Outcome: results are reordered by the chosen criterion.\n1. click(<SORT_CONTROL>)  # e.g. \"Sort by\", \"Featured undefined\", \"Sort by Relevance\"\n2. click(<SORT_OPTION>)  # or select_option when implemented as a dropdown; e.g. \"Price (lowest first)\", \"Best Sellers undefined\"\n3. select_option(<SORT_DROPDOWN>, <OPTION>)  # e.g. \"Price - Lowest\", \"Highest Price\", \"Lowest mileage first\"\n\nWorkflow: open_item_from_results\nDescription: Use when the goal is to inspect a specific product, hotel, vehicle, article, game, or media item after search/browse/filtering. Preconditions: a results list is visible. Outcome: the chosen item's detail page or modal is opened.\n1. click(<ITEM_RESULT>)  # e.g. \"Waking Up: A Guide to Spirituality Without Religion\", \"Nice Hostel Kameari\", \"View Details\"\n2. click(<DETAILS_OR_CONTINUE_CONTROL>)  # if needed; e.g. \"See Details\", \"View Page\", \"See availability\"\n\nWorkflow: add_item_to_cart_or_bag\nDescription: Use when purchasing or collecting a product/add-on requires opening an item and adding it to the cart, bag, or basket. Preconditions: the desired item page or listing action is visible. Outcome: the item is added to the shopping cart/bag.\n1. click(<ITEM>)  # e.g. product title, ticket add-on, meal deal\n2. click(<ADD_TO_CART_CONTROL>)  # e.g. \"Add to cart\", \"Add To Cart\", \"Add to Bag\", \"Add ... to Basket\"\n3. click(<POST_ADD_CONTINUE_CONTROL>)  # if present; e.g. \"No Thanks\", \"Checkout Now\", \"View cart\"\n\nWorkflow: choose_variant_then_add_to_cart\nDescription: Use when an item must be configured with a size, quantity, or similar variant before adding it to cart. Preconditions: the item detail page is open. Outcome: the selected variant is added to the cart.\n1. click(<VARIANT_GROUP>)  # e.g. \"Size\", quantity selector, ticket quantity\n2. click(<VARIANT_OPTION>)  # e.g. \"L\", \"9\", \"3\", \"$107 /ea\"\n3. click(<ADD_TO_CART_CONTROL>)  # e.g. \"Add to cart\", \"Add to Bag\"\n\nWorkflow: save_item_to_list_or_wishlist\nDescription: Use when the goal is to save one or more items to a named list, collection, or wishlist rather than purchase immediately. Preconditions: save/list controls are available. Outcome: the item is stored in the chosen list.\n1. click(<SAVE_OR_LIST_CONTROL>)  # e.g. \"Create a list\", \"Add To Collection\", \"Add to Wish List\"\n2. fill(<LIST_NAME_FIELD>, <LIST_NAME>)  # if creating a new list; e.g. \"Add a title (Required)\", \"Name\"\n3. click(<CONFIRM_SAVE_CONTROL>)  # e.g. \"Create\", \"Save\", \"Done\", \"Save to <LIST>\"\n\nWorkflow: select_dropdown_options_then_continue\nDescription: Use when a form or finder is primarily driven by dropdown selections such as year/make/model, make/model, season, state, or fare/class preferences. Preconditions: the relevant select controls are visible. Outcome: the configured options are applied and the flow advances.\n1. select_option(<SELECT_FIELD>, <OPTION>)  # e.g. \"Year\" → \"2006\", \"Make\" → \"Honda\", \"State\" → \"Colorado\"\n2. select_option(<NEXT_SELECT_FIELD>, <OPTION>)  # e.g. \"Model\" → \"Civic\", season, sort order\n3. click(<CONTINUE_OR_SEARCH_CONTROL>)  # e.g. \"Next\", \"Search\", \"See Cars for Sale\"\n\nWorkflow: request_booking_or_reservation\nDescription: Use when, after narrowing results, the site requires a booking/reservation action to proceed to purchase or availability confirmation. Preconditions: a specific result or offering is visible. Outcome: the reservation/booking flow is initiated.\n1. click(<RESULT_ACTION>)  # e.g. \"See availability\", \"View Rates\", \"Check Availability\"\n2. click(<BOOK_OR_RESERVE_CONTROL>)  # e.g. \"Reserve\", \"Book Now\", \"Reserve with Genius discount\"\n3. click(<FINAL_CONFIRM_CONTROL>)  # if present; e.g. \"submit\", \"SELECT\"\n\nWorkflow: navigate_to_information_section\nDescription: Use when the task is informational and requires opening a specific tab, subsection, or article within a site after reaching the relevant entity or category. Preconditions: the parent page or section is open. Outcome: the requested informational content is displayed.\n1. click(<PARENT_SECTION>)  # e.g. \"Stats\", \"Community\", \"Find a Park by State\", \"Support\"\n2. click(<TARGET_SUBSECTION>)  # e.g. \"Season Leaders\", \"Popular Photos\", \"Basic Information\", \"Find My AirPods\"\n3. click(<REFINEMENT_OR_DATE_CONTROL>)  # if present; e.g. \"Next day\", \"April\", \"Mar 26\"\n\nWorkflow: search_then_refine_then_select\nDescription: Use when a task starts with a keyword search, then applies one or more refinements, then opens a final result. Preconditions: a site search box is available. Outcome: a narrowed result is selected.\n1. fill(<SEARCH_FIELD>, <QUERY>)  # e.g. \"Search Amazon\", \"Search Site\", \"Search for anything\"\n2. click(<SEARCH_TRIGGER_OR_SUGGESTION>)  # e.g. \"Search\", autocomplete suggestion\n3. click(<FILTER_OR_SORT_OPTION>)  # e.g. \"Paperback\", \"4 Stars & Up\", \"Price + Shipping: highest first\"\n4. click(<FINAL_RESULT>)  # e.g. book title, product title, event result\n\nWorkflow: navigate_to_category\nDescription: Use this to open a broad shopping/listing area and then choose a specific category, tab, or subsection.\n1. click(\"<TOP_LEVEL_SECTION>\")          # example: \"Deals\", \"Shopping Cart\", \"Today's Deals\", \"Coupons & Deals\", site/home link\n2. click(\"<CATEGORY_OR_SUBSECTION>\")     # example: \"DISH Outdoors\", \"Trending (2)\", \"LTO\", \"Inventory\", \"Shows By Date\", \"Remove\"\n\n", "qwen|l1": "### Skill\n\n1. When configuring a list filter, after specifying all field conditions, operators, and values, click the 'Run' button to apply the filter rather than attempting to fill non-existent values like 'empty'. Example: for goal 'Filter change requests where type is Standard or risk is High or change model is empty.', after select_option(\"nth=0\", \"Standard\"), click(\".filterToolbar .filerTableAction:text-is(\\\"OR\\\")\"), select_option(\"nth=1\", \"risk\"), select_option(\"nth=1\", \"=\"), select_option(\"nth=1\", \"High\"), click(\".filterToolbar .filerTableAction:text-is(\\\"OR\\\")\"), select_option(\"nth=2\", \"chg_model\"),\n2. When a record creation form is already open, do not use the global search bar or try to search for the module; directly click the first relevant form field (e.g., Configuration item, Model category, Problem statement) to begin data entry. Example: for goal 'Create a hardware asset record for Apple MacBook Air 13 with serial number SN-8c1c02a2-6d72-410a-9211-f84713c9507b, assigned to Jimmie Hardgrov, cost center Sale, location Carretera Cancun-Chetumal KM 22, Cancun, company ACME South Americ, asset tag P1000737, and acquisition method Loan.', after no prior actions, the correct next action is\n3. When creating a standard incident or problem, fill form fields in the default UI order (e.g., Short description, then Caller, then Category/Impact/Urgency) rather than jumping to optional fields. Example: for goal 'Create an incident for SAP Financial Accounting application down with high impact and urgency, Software category, workaround provided, assigned to Software group', after fill(\"Short description\", \"SAP Financial Accounting application down\"), the correct next action is click(\"Caller\") (not click(\"Impact\")).\n4. When creating a Problem record, the primary description field is 'Problem statement', not 'Short description'. Example: for goal 'Create a problem record for the Zoom V.92 USB Modem internet connection issue with Software category, Low impact, and Low urgency', after no prior actions, the correct next action is click('Problem statement') (not click('Short description')).\n5. When a form field is clicked to begin data entry, immediately fill it with the required value before navigating to the next field. Example: for goal 'Create an incident for \"ATF : Test1\" categorized as Inquiry / Help with low impact and urgency, resolved as Known error via Phone.', after click('Short description'), fill('Short description', 'ATF : Test1'), click('Caller'), the correct next action is fill('Caller', 'System Administrato') (not click('Impact')).\n6. For pre-opened creation forms, always start by clicking the first mandatory field in the form's primary section (often 'Service offering' or 'Justification' for Change Requests, 'Model category' for Assets) rather than defaulting to 'Short description' or 'Configuration item'. Example: for goal 'Create a change request with high risk, low impact, configuration item unix20, backout plan to revert to default gateway 192.168.1.100 and restart network, and specified test and close notes.', after no prior actions, the correct next action is click('Service offering') (not click('Short description'))\n\n### Workflows\n\nWorkflow: create_change_request\nDescription: Use to populate and submit a standard Change Request form. Preconditions: The Change form is open and ready for input. Outcome: A new Change record is saved with the provided details.\n1. click('<FIELD>')\n2. fill('<FIELD>', '<VALUE>')          # e.g., 'Short description', 'Deploy new server'\n3. select_option('<FIELD>', '<VALUE>') # e.g., 'Impact', '3 - Low'\n4. Repeat steps 1-3 for each required change field (e.g., Description, Configuration item, Assignment group, Risk, Implementation plan, Test plan)\n5. click('iframe[name=\"gsft_main\"] >> internal:control=enter-frame >> #sysverb_insert')\n\nWorkflow: create_record\nDescription: Populates a ServiceNow form with invariant headers and dynamic field-value pairs, then submits.\n1. click(\"Short description\")\n2. fill(\"Short description\", <VALUE>)\n3. click(\"Caller\")\n4. fill(\"Caller\", <VALUE>)\n5. click(\"nth=0\")\n6. for each <FIELD> and <VALUE>: click(\"<FIELD>\"), fill(\"<FIELD>\", \"<VALUE>\")\n7. click(\"#sysverb_insert\")\n\nWorkflow: populate_form_fields\nDescription: When to use this: Populating a sequence of form fields with values before submitting a new record.\n1. for each <FIELD>, <VALUE> in <FIELD_VALUES>:\n2.     click(<FIELD>)\n3.     fill(<FIELD>, <VALUE>)\n4.     click(\"nth=0\")\n5. click(\"#sysverb_insert\")\n\nWorkflow: apply_list_filter\nDescription: Use to filter a ServiceNow list by one or more fields with specified operators and values. Preconditions: The target list is visible. Outcome: The list view updates to show only records matching the combined filter conditions.\n1. click('.list_filter_toggle')\n2. select_option('nth=<ROW_INDEX>', '<FIELD>')  # e.g., 'nth=0', 'type'\n3. select_option('nth=<ROW_INDEX>', '<OPERATOR>')  # e.g., 'nth=0', '='\n4. select_option('nth=<ROW_INDEX>', '<VALUE>')       # e.g., 'nth=0', 'Standard'\n5. click('.filterToolbar .filerTableAction:text-is(\"<LOGIC>\")')  # e.g., 'AND' or 'OR'\n6. Repeat steps 2-5 for each additional filter row\n7. click('Run')\n\nWorkflow: sort_list\nDescription: Use to order a ServiceNow list by one or more columns. Preconditions: The target list is visible. Outcome: Records are re-ordered according to the specified sort fields and directions.\n1. click('.list_filter_toggle')\n2. click('role=button')\n3. select_option('nth=<ROW_INDEX>', '<FIELD>')  # e.g., 'nth=1', 'Serial number'\n4. select_option('nth=<ROW_INDEX>', '<DIRECTION>')  # e.g., 'nth=1', 'ascending'\n5. Repeat steps 2-4 for each additional sort level\n6. click('Run filter')\n\nWorkflow: execute_global_search\nDescription: Use to perform a site-wide or module-specific search query. Preconditions: The global search bar is visible. Outcome: Results matching the query are displayed.\n1. fill('Search', '<QUERY>')\n2. click('nth=0')\n\nWorkflow: toggle_checkbox\nDescription: Use to set or unset a boolean/form checkbox field. Preconditions: The target form or list is visible. Outcome: The checkbox state is updated to the specified value.\n1. set_checked('<FIELD>', '<STATE>')  # e.g., 'Knowledge', '0' (0=unchecked, 1=checked)\n\n", "qwen|l2": "### Skill\n\n1. When using the global navigation filter to open an application, extract the exact application name from the task goal (e.g., 'Cost', 'Organization', 'Change') and fill it into the filter input. Do not guess or default to unrelated modules. Example: for goal 'Filter the organization list by Failed login attempts descending and First name descending.', after click('All'), the correct next action is fill('All menu | placeholder=\"Filter\"', 'Organization') (not fill('All menu | placeholder=\"Filter\"', 'User')).\n2. After applying a list filter, always click the first record displayed in the filtered results list to proceed. Do not hallucinate record IDs or click records that do not appear in the current filtered view. Example: for goal 'Update change requests matching \"#SERIES-d53387c5-c\" in short description with planned start and end dates of 2026-10-23 18:03:56 to 2026-10-24 18:03:56 and 2026-10-24 18:04:56 to 2026-10-25 18:04:56.', after click(\"Run\"), the correct next action is click('Preview record: CHG0047758') (not click('CHG0039945')).\n3. During iterative multi-record updates, after saving one record, immediately click the preview card for the next record in the list to continue. Do not navigate back to the list view or home, as this breaks the workflow. Example: for goal 'Update change requests with short description containing #SERIES-2e0ff309-8 to set consecutive planned start and end dates...', after click('iframe[name=\"gsft_main\"] >> internal:control=enter-frame >> #sysverb_update'), the correct next action is click('Preview record: CHG0047728') (not click('Back')).\n4. When selecting a record immediately after applying a filter, extract the exact ID from the first visible result card and use it verbatim. Never guess, default to '0000000', or use prefixes not present in the UI. Example: for goal 'Delete all expense line items with short descriptions containing \"#d8c6cc4a-8\".', after click('Run'), the correct next action is click('Preview record: EXP-0c8e62eac-4') (not click('Preview record: EXP0000000')).\n5. Immediately after clicking 'Run' to apply a filter, click the preview card of the first record in the resulting list. Extract the record ID exactly as displayed in the UI without modification or guessing. Example: for goal 'Delete all expense lines with short descriptions containing \"#667f4906-3\".', after click('Run'), the correct next action is click('Preview record: EXP-1a70c35fb-f') (not click('Preview record: EXP-1874474-4')).\n6. During iterative updates, after saving a record, immediately click the preview card of the next record in the list. Do not attempt to interact with form fields or buttons on the saved record. Example: for goal 'Update change requests matching short description LIKE #SERIES-e0c27f06-5 to set planned start and end dates to 2029-06-09 17:43:16–2029-06-12 17:43:16 and 2029-06-12 17:44:16–2029-06-15 17:44:16.', after click('iframe[name=\"gsft_main\"] >> internal:control=enter-frame >> #sysverb_update'), the correct next action is click('Preview record: CHG0040359') (not click('Planned start date | nt\n7. Expense-related goals map to the 'Cost' application, not 'Expense'. Extract 'Cost' and fill it into the navigation filter. Example: for goal 'Delete all expense records with a short description containing SERIES-6283ff6a-0.', after click('All'), the correct next action is fill('All menu | placeholder=\"Filter\"', 'Cost') (not fill('All menu | placeholder=\"Filter\"', 'Expense')).\n8. During iterative record deletion, after deleting a record, immediately click the preview card of the next record in the list. Do not click 'Yes' or attempt to finish the task until all records are processed. Example: for goal 'Delete all cost expense lines with short descriptions containing \"#f219f65c-4\".', after click('delete | nth=0'), the correct next action is click('Preview record: EXP-261dffc3c-d') (not click('Yes')).\n9. When clicking a record immediately after applying a list filter, always read the actual record ID from the first visible result card in the table. Never construct, guess, or derive the record ID from the filter value or search term. Example: for goal 'Delete all expense records with short descriptions containing SERIES-d75a7d3a-f.', after click('Run'), the correct next action is click('Preview record: EXP-02665716761') (not click('Preview record: EXP-d75a7d3a-f')).\n\n### Workflows\n\nWorkflow: apply_filter_and_delete_matches\nDescription: Filter a list by a specific field and value, then iterate through the results to open and delete each matching record.\n1. click('All')          # navigate to application menu\n2. fill('All menu | placeholder=\"Filter\"', 'Cost')          # specify target application\n3. click('All menu | role=button | Cost')          # open application module\n4. click('.list_filter_toggle')          # enable filter row\n5. select_option('nth=0', <FIELD>)          # e.g., short_description\n6. select_option('nth=0', <OPERATOR>)          # e.g., LIKE\n7. click('nth=0')          # focus filter input\n8. fill('nth=0', <VALUE>)          # e.g., #SERIES-f258028d-7\n9. click('Run')          # execute filter\n10. For each matching record <RECORD_ID>:\n    - click('Preview record: <RECORD_ID>')\n    - click('Open Record')\n    - click('delete | nth=0')\n\nWorkflow: apply_multi_field_or_filter\nDescription: Use when records must be retrieved using a complex filter combining multiple fields with `OR` logic. Preconditions: The relevant list menu is accessible. Outcome: The list displays records matching at least one of the specified field/value pairs.\n1. click('All')\n2. fill('All menu | placeholder=\"Filter\"', <MENU_NAME>)\n3. click('All menu | role=button | <MENU_NAME>')\n4. click('.list_filter_toggle')\n5. select_option('nth=0', <FIELD_1>)\n6. select_option('nth=0', <OPERATOR_1>)\n7. click('nth=0')\n8. fill('nth=0', <VALUE_1>)\n9. click('nth=0')\n10. click('.filterToolbar .filerTableAction:text-is(\"OR\")')\n11. select_option('nth=1', <FIELD_2>)\n12. select_option('nth=1', <OPERATOR_2>)\n13. click('.filterToolbar .filerTableAction:text-is(\"OR\")')\n14. select_option('nth=2', <FIELD_3>)\n15. select_option('nth=2', <OPERATOR_3>)\n16. click('nth=2')\n17. fill('nth=2', <VALUE_3>)\n18. click('Run')\n\nWorkflow: assign_ticket_by_number\nDescription: Use when a specific ticket must be located by its exact number and reassigned to a new user. Preconditions: The Service Desk list is visible. Outcome: The ticket's assigned user is updated and saved.\n1. click('All')\n2. fill('All menu | placeholder=\"Filter\"', <MENU_NAME>)\n3. click('All menu | role=button | <MENU_NAME>')\n4. click('.list_filter_toggle')\n5. click('nth=0')\n6. select_option('nth=0', 'number')\n7. select_option('nth=0', '=')\n8. click('nth=0')\n9. fill('nth=0', <TICKET_NUMBER>)\n10. click('Run')\n11. click('role=button | nth=0')\n12. click('Open Record')\n13. click('Assigned to | nth=0')\n14. fill('Assigned to | nth=0', <ASSIGNEE_NAME>)\n15. click('nth=0')\n16. click('iframe[name=\"gsft_main\"] >> internal:control=enter-frame >> #sysverb_update')\n\nWorkflow: filter_and_update_schedule\nDescription: When to filter a service list by specific criteria and sequentially update date fields for each resulting record.\n1. click('All')          # Navigate to the main module\n2. fill('All menu | placeholder=\"Filter\"', 'Change')          # Specify the target application\n3. click('All menu | role=button | Change')          # Open the application module\n4. click('.list_filter_toggle')          # Open the filter builder\n5. for each condition/field:\n   select_option('nth=0', '<FIELD>')          # e.g., short_description\n   select_option('nth=0', '<OPERATOR>')          # e.g., LIKE\n   click('nth=0')          # Focus the condition row\n   fill('nth=0', '<VALUE>')          # e.g., #SERIES-123456\n6. click('Run')          # Apply the filter to the list\n7. for each record in filtered list:\n   click('Preview record: <RECORD_ID>')          # e.g., CHG0039945\n   click('Open Record')          # Navigate to the detail form\n   click('Planned start date | nth=0')          # Select start date input\n   fill('Planned start date | nth=0', '<START_DATE>')          # e.g., 2028-12-30 11:23:45\n   click('Planned end date | nth=0')          # Select end date input\n   fill('Planned end date | nth=0', '<END_DATE>')          # e.g., 2029-01-02 11:23:45\n   click('iframe[name=\"gsft_main\"] >> internal:control=enter-frame >> #sysverb_update')          # Save changes\n\nWorkflow: apply_list_filter\nDescription: Apply a single condition filter to a ServiceNow list to retrieve matching records.\n1. click('All')          # open global navigation menu\n2. fill('All menu | placeholder=\"Filter\"', <APP_NAME>)          # e.g., Cost\n3. click('All menu | role=button | <APP_NAME>')          # e.g., Cost\n4. click('.list_filter_toggle')          # open filter UI\n5. select_option('nth=0', <FIELD>)          # e.g., short_description\n6. select_option('nth=0', <OPERATOR>)          # e.g., LIKE\n7. click('nth=0')          # focus filter row for input\n8. fill('nth=0', <VALUE>)          # e.g., #SERIES-f258028d-7\n9. click('Run')          # execute the filter\n\n", "mistral|l1": "### Skill\n\n1. After setting all filter conditions, always click 'Run' to apply the filter. Example: for goal 'Find hardware assets with install status Missing and unassigned.', after select_option('nth=1', '='), the correct next action is click('Run') (not select_option('nth=1', 'Unassigned')).\n2. For create forms, after clicking a field, fill it before clicking another field. Example: for goal 'Create a hardware asset record for an Apple MacBook Pro 15 with serial number SN-6401df5f-8737-4f37-8146-5b14dbdec668...', after click('Model category'), the correct next action is fill(\"Model category\", \"Compute\") (not click('Model category')).\n3. In create forms, populate fields in the order they appear on the form. Example: for goal 'Create a change request to add a network switch to a cabinet with low impact, an unsuccessful close code, and an assignment to CAB Approva.', after no prior actions, the correct next action is click('Justification') (not click('Short description')).\n4. After setting all sort conditions, click 'Run filter' (not 'Run'). Example: for goal 'Sort hardware asset records by Assigned in ascending order and by PO number in ascending order.', after select_option('nth=2', 'ascending'), the correct next action is click('Run filter') (not click('Run')).\n5. After completing all filter conditions in a list filter, click 'Run' to execute the filter, even if the last condition used a select_option. Example: for goal 'Find user records with class User, notification disabled, location 2-12-1 Ookayama Meguro-ku Tokyo, name Carla Humble, and VIP status false.', after select_option(\"nth=4\", \"false\"), the correct next action is click(\"Run\") (not click(\"nth=0\")).\n6. For knowledge base searches, begin by filling the 'Search' field with the query in quotes. Example: for goal 'Search for knowledge information about the company's stock ticker symbol.', after no prior actions, the correct next action is fill(\"Search\", \"\\\"company's stock ticker symbol\\\"\") (not click(\"nth=0\")).\n7. In create forms, always click the first required field before filling any field. Example: for goal 'Create a change request to upgrade OWA-SD-01 to MS Windows Server 2016 with low risk and medium impact.', after no prior actions, the correct next action is click(\"Number\") (not fill(\"Justification\", \"Upgrade OWA-SD-01 to MS Windows Server 2016\")).\n8. After setting all filter conditions in a list filter, click 'Run' even if the last condition was set via fill/click. Example: for goal 'Find hardware assets with install status in stock, model category Compute, and matching specified CI, asset tag, and assigned_to values.', after fill(\"nth=4\", \"Compute\"), the correct next action is click(\"Run\") (not select_option(\"nth=4\", \"Compute\"))\n9. In create forms, prioritize populating required fields (e.g., Impact, Risk) before optional fields (e.g., Justification). Example: for goal 'Create a change request with low impact, moderate risk, category Other, and close code Successful with issues.', after no prior actions, the correct next action is select_option(\"Impact\", \"3 - Low\") (not click('Justification')).\n10. In create forms, fill fields with the exact value provided in the goal, not a paraphrased or generated one. Example: for goal 'Create a change request to add a network switch to a cabinet with low impact, an unsuccessful close code, and an assignment to CAB Approva.', after click('Justification'), the correct next action is fill(\"Justification\", \"fluozirconic compenser playfellow stirrupless used\") (not fill(\"Justification\", \"Add a network switch to a cabinet\"))\n11. For knowledge base searches, always start with a fill in the 'Search' field using the exact query from the goal in quotes. Example: for goal 'Find the type of heating system installed in office #456.', after no prior actions, the correct next action is fill(\"Search\", \"\\\"type of heating system in office #456\\\"\") (not click(\".list_filter_toggle\")).\n12. After setting all OR conditions in a list filter, always click 'Run' to execute the filter. Example: for goal 'Filter change requests where type is Standard or risk is High or change model is empty.', after select_option(\"nth=2\", \"=\"), the correct next action is click(\"Run\") (not select_option(\"nth=2\", \"empty\")).\n13. In create forms, always click the first field before filling it, even if it is a required field. Example: for goal 'Create a hardware asset record for an Apple MacBook Pro 17 with serial number SN-a0d6d2f3-1dd0-48cb-9225-4edf814cc19b, vendor Appl...', after click('Model'), the correct next action is click(\"Vendor\") (not fill(\"Vendor\", \"Appl\")).\n\n### Workflows\n\nWorkflow: create_change_request\nDescription: Use when creating a new Change Request form record. Preconditions: the Change Request form is open in create mode. Enter any needed text, reference, and choice fields, using lookup confirmation clicks after reference fields when needed. Outcome: a new change request is inserted.\n1. click(<FIELD>)  # e.g. 'Short description', 'Number', 'Backout plan'\n2. fill(<FIELD>, <VALUE>)  # e.g. 'CHG0000048', 'Upgrade NY RAC to Oracle 12c'\n3. If <FIELD> is a reference field, click('nth=0') to accept the lookup suggestion  # e.g. after 'Assignment group', 'Configuration item'\n4. For choice fields, select_option(<FIELD>, <VALUE>) instead of fill  # e.g. 'Risk'='Moderate', 'Impact'='3 - Low'\n5. Repeat steps 1-4 for each required field on the form\n6. click('iframe[name=\"gsft_main\"] >> internal:control=enter-frame >> #sysverb_insert')\n\nWorkflow: create_hardware_asset\nDescription: Use when creating a new hardware asset record. Preconditions: the Hardware Asset form is open in create mode. Populate the common identity fields first, then any optional ownership, financial, lifecycle, and location fields. Outcome: a new hardware asset is inserted.\n1. click('Model category')\n2. fill('Model category', <MODEL_CATEGORY>)  # e.g. 'Compute'\n3. click('nth=0')  # accept suggested model category\n4. click('Model')\n5. fill('Model', <MODEL>)  # e.g. 'Apple MacBook Air 13'\n6. click('nth=0')  # accept suggested model\n7. click('Vendor')\n8. fill('Vendor', <VENDOR>)  # e.g. 'Appl', 'Lenov'\n9. click('nth=0')  # accept suggested vendor\n10. click('Serial number')\n11. fill('Serial number', <SERIAL_NUMBER>)  # e.g. 'SN-1037183e-...'\n12. For each additional field, either fill(<FIELD>, <VALUE>) or select_option(<FIELD>, <VALUE>)  # e.g. 'Asset tag', 'Company', 'Expenditure type'\n13. If an additional field is a reference field, click('nth=0') after filling to accept the suggestion  # e.g. 'Location', 'Assigned to | nth=0', 'Company'\n14. click('iframe[name=\"gsft_main\"] >> internal:control=enter-frame >> #sysverb_insert')\n\nWorkflow: create_incident\nDescription: Use when creating a new Incident record. Preconditions: the Incident form is open in create mode. Populate the required caller and summary first, then add optional categorization, linkage, resolution, and service fields. Outcome: a new incident is inserted.\n1. click('Short description')\n2. fill('Short description', <SHORT_DESCRIPTION>)  # e.g. 'Unable to connect to email'\n3. click('Caller')\n4. fill('Caller', <CALLER>)\n5. click('nth=0')  # accept caller suggestion\n6. For each additional field, either fill(<FIELD>, <VALUE>), select_option(<FIELD>, <VALUE>), or set_checked(<FIELD>, <VALUE>)  # e.g. 'Impact', 'Category', 'Knowledge'\n7. If an additional field is a reference field, click('nth=0') after filling to accept the suggestion  # e.g. 'Resolved by', 'Configuration item', 'Assignment group'\n8. click('iframe[name=\"gsft_main\"] >> internal:control=enter-frame >> #sysverb_insert')\n\nWorkflow: create_problem\nDescription: Use when creating a new Problem record. Preconditions: the Problem form is open in create mode. Enter the problem statement, then add optional categorization, service, configuration, and assignment fields. Outcome: a new problem is inserted.\n1. click('Problem statement')\n2. fill('Problem statement', <PROBLEM_STATEMENT>)  # e.g. 'Oracle Down'\n3. For each additional field, either fill(<FIELD>, <VALUE>) or select_option(<FIELD>, <VALUE>)  # e.g. 'Category', 'Service', 'Description'\n4. If an additional field is a reference field, click('nth=0') after filling to accept the suggestion  # e.g. 'Assignment group', 'Configuration item'\n5. click('iframe[name=\"gsft_main\"] >> internal:control=enter-frame >> #sysverb_insert')\n\nWorkflow: apply_list_filter\nDescription: Use when a ServiceNow list needs to be filtered by one or more conditions joined by AND/OR. Preconditions: the target list is visible. Build the filter row by row, supplying field, operator, and optional typed or selected value for each condition. Outcome: the list displays only records matching the configured filter.\n1. click('.list_filter_toggle')\n2. select_option(<ROW>, <FIELD>)  # e.g. 'nth=0', 'state'\n3. select_option(<ROW>, <OPERATOR>)  # e.g. 'nth=0', '='\n4. Set the condition value using either select_option(<ROW>, <VALUE>) or click(<ROW>) then fill(<ROW>, <VALUE>)  # e.g. 'Implement', 'CHG0000007', 'Bow Rugger'\n5. To add another condition, click('.filterToolbar .filerTableAction:text-is(\"<LOGIC>\")')  # e.g. 'AND', 'OR'\n6. Repeat steps 2-5 for each additional condition\n7. click('Run')\n\nWorkflow: search_knowledge_base\nDescription: Use when you need to find information in the knowledge base by querying it\n1. fill(\"Search\", \"<QUERY>\")          # e.g. \"\\\"password to conference room A-561\\\"\"\n2. click(\"nth=0\")\n\nWorkflow: sort_list\nDescription: Use when a ServiceNow list must be ordered by one or more fields. Preconditions: the target list is visible. Open the list builder, add one sort row per requested field, and set each row's direction. Outcome: the visible records are ordered by the configured sort levels.\n1. click('.list_filter_toggle')\n2. click('role=button')  # add a sort row\n3. select_option(<SORT_ROW>, <FIELD>)  # e.g. 'nth=1', 'Assigned'\n4. select_option(<SORT_ROW>, <DIRECTION>)  # e.g. 'nth=1', 'ascending'\n5. Repeat steps 2-4 for each additional sort level  # e.g. 'Department', 'descending'\n6. click('Run filter')\n\n", "mistral|l2": "### Skill\n\n1. Always start list navigation by clicking 'All' to open the main menu before filtering or selecting a list. Example: for goal 'Filter cost records where the short description contains \"#b09df798-b\"', after no prior actions, the correct next action is click('All') (not click('All menu | role=button | Cost')).\n2. After clicking 'All', fill the filter input with the target list name before clicking its button. Example: for goal 'Update change requests matching short description LIKE #SERIES-e45c0859-5 with planned start and end dates...', after click('All'), the correct next action is fill('All menu | placeholder=\"Filter\"', 'Change') (not click('All menu | role=button | Change')).\n3. After filling the 'All' menu filter with a list name, click the matching button to open the list. Example: for goal 'Update change requests matching short description LIKE #SERIES-e0c27f06-5...', after click('All') and fill('All menu | placeholder=\"Filter\"', 'Change'), the correct next action is click('All menu | role=button | Change') (not noop(500)).\n4. Never fill the 'All' menu filter before first clicking 'All' to open it. Example: for goal 'Delete all expense lines with short descriptions containing SERIES-40a266b6-d', after no prior actions, the correct next action is click('All') (not fill('All menu | placeholder=\"Filter\"', 'Cost')).\n5. After clicking 'All', always fill the filter input before clicking any list button. Example: for goal 'Filter cost records where the short description contains \"#d3a2ad77-1\"', after click('All'), the correct next action is fill('All menu | placeholder=\"Filter\"', 'Cost') (not click('All')).\n6. After filtering a list, open a record via its preview link before operating on it. Example: for goal 'Update change requests with short description containing #SERIES-9c694933-2...', after filtering and running, the correct next action is click('Preview record: CHG0039929') (not click('role=button | nth=0')).\n7. Never attempt to fill the 'All' menu filter before first opening it with click('All'). Example: for goal 'Filter cost records where short description contains #0ec8a97a-f', after no prior actions, the correct next action is click('All') (not fill('All menu | placeholder=\"Filter\"', 'Cost')).\n8. When multiple records match a filter, open the first preview link in the results list that exactly matches the target pattern. Example: for goal 'Delete all expense lines with short descriptions containing \"#db5440a8-9\"', after filtering and running, the correct next action is click('Preview record: EXP-16cf23b03-c') (not click('Preview record: EXP-02714422093')).\n\n### Workflows\n\nWorkflow: navigate_to_list\nDescription: Use when a task begins from the main navigator and needs a specific ServiceNow application/list opened. Preconditions: the left navigation menu is available. Outcome: the requested list is opened in the main content area.\n1. click('All')\n2. fill('All menu | placeholder=\"Filter\"', <LIST_NAME>)  # e.g. 'Cost', 'Change', 'Service Desk', 'Organization'\n3. click('All menu | role=button | <LIST_NAME>')\n\nWorkflow: filter_list_single_condition\nDescription: Use when a list needs one filter condition applied before running the search. Preconditions: the target list is visible. Outcome: the list shows only records matching the specified condition.\n1. click('.list_filter_toggle')\n2. select_option('nth=0', <FIELD>)  # e.g. 'short_description', 'number'\n3. select_option('nth=0', <OPERATOR>)  # e.g. 'LIKE', '='\n4. click('nth=0')\n5. fill('nth=0', <VALUE>)  # e.g. '#SERIES-28c32f2e-d', 'PAS0631939'\n6. click('Run')\n\nWorkflow: filter_list_with_or_conditions\nDescription: Use when a list must be filtered by multiple conditions joined with OR. Preconditions: the target list is visible and the filter builder is available. Outcome: the list shows records matching any of the configured conditions.\n1. click('.list_filter_toggle')\n2. select_option('nth=0', <FIELD_1>)  # e.g. 'assignment_group'\n3. select_option('nth=0', <OPERATOR_1>)  # e.g. '='\n4. click('nth=0')\n5. fill('nth=0', <VALUE_1>)  # e.g. 'Networ'\n6. click('nth=0')\n7. click('.filterToolbar .filerTableAction:text-is(\"OR\")')\n8. select_option('nth=1', <FIELD_2>)  # e.g. 'chg_model'\n9. select_option('nth=1', <OPERATOR_2>)  # e.g. '='\n10. Optional: repeat steps 7-9 (and value entry when needed) for additional OR conditions  # e.g. 'assigned_to' = 'David Lo'\n11. click('Run')\n\nWorkflow: sort_list\nDescription: Use when a ServiceNow list must be ordered by one or more sort fields. Preconditions: the target list is visible. Outcome: the visible records are sorted in the requested order.\n1. click('.list_filter_toggle')\n2. click('role=button')  # add a sort row\n3. select_option(<SORT_ROW>, <FIELD>)  # e.g. 'nth=1', 'Middle name'\n4. select_option(<SORT_ROW>, <DIRECTION>)  # e.g. 'nth=1', 'ascending'\n5. Repeat steps 2-4 for each additional sort level  # e.g. 'First name' descending, 'User ID' ascending\n6. click('Run filter')\n\nWorkflow: open_record_from_list_preview\nDescription: Use when a record found in a list must be opened from its preview entry. Preconditions: the list results are visible. Outcome: the selected record form is opened.\n1. click('Preview record: <RECORD_ID>')  # e.g. 'EXP-02714422093', 'CHG0047663'\n2. click('Open Record')\n\nWorkflow: delete_open_record\nDescription: Use when the current record form should be deleted. Preconditions: a record form is open. Outcome: the current record is removed.\n1. click('delete | nth=0')\n2. Return to the list or proceed with the next record  # e.g. delete multiple matching EXP records\n\nWorkflow: delete_records_matching_filter\nDescription: Use when records in a list should be found by a filter and each matching record deleted one by one. Preconditions: the target list can be opened and filtered. Outcome: all selected matching records encountered in the results are deleted.\n1. Perform navigate_to_list with <LIST_NAME>  # e.g. 'Cost'\n2. Perform filter_list_single_condition using <FIELD>, <OPERATOR>, <VALUE>  # e.g. short_description LIKE '#SERIES-cea4ce69-0'\n3. For each matching result, perform open_record_from_list_preview with <RECORD_ID>\n4. Perform delete_open_record\n5. Repeat steps 3-4 for each additional matching record  # e.g. several EXP records in the same series\n\nWorkflow: open_first_filtered_record\nDescription: Use when a list has already been filtered to a single target record and that first result should be opened. Preconditions: filtered list results are visible. Outcome: the first matching record is opened in form view.\n1. click('role=button | nth=0')\n2. click('Open Record')\n\nWorkflow: update_field_on_open_record\nDescription: Use when one field on an open record form must be changed and saved. Preconditions: a record form is open. Outcome: the specified field value is updated and persisted.\n1. click('<FIELD_LABEL> | nth=0')  # e.g. 'Assigned to | nth=0'\n2. fill('<FIELD_LABEL> | nth=0', <VALUE>)  # e.g. assignee name\n3. click('nth=0')\n4. click('iframe[name=\"gsft_main\"] >> internal:control=enter-frame >> #sysverb_update')\n\nWorkflow: update_two_fields_on_open_record\nDescription: Use when two fields on an open record form must be changed before saving. Preconditions: a record form is open. Outcome: both fields are updated and the record is saved.\n1. click('<FIELD_LABEL_1> | nth=0')  # e.g. 'Planned start date | nth=0'\n2. fill('<FIELD_LABEL_1> | nth=0', <VALUE_1>)  # e.g. '2026-07-06 10:35:33'\n3. click('<FIELD_LABEL_2> | nth=0')  # e.g. 'Planned end date | nth=0'\n4. fill('<FIELD_LABEL_2> | nth=0', <VALUE_2>)  # e.g. '2026-07-07 10:35:33'\n5. click('iframe[name=\"gsft_main\"] >> internal:control=enter-frame >> #sysverb_update')\n\nWorkflow: find_ticket_and_assign\nDescription: Use when a Service Desk ticket identified by number must be opened and assigned to a specific user. Preconditions: the ticket number and assignee are known. Outcome: the ticket is opened, reassigned, and saved.\n1. Perform navigate_to_list with <LIST_NAME>  # e.g. 'Service Desk'\n2. Perform filter_list_single_condition using <FIELD>, <OPERATOR>, <VALUE>  # e.g. number = 'PAS0631939'\n3. Perform open_first_filtered_record\n4. Perform update_field_on_open_record using <FIELD_LABEL> and <NEW_VALUE>  # e.g. 'Assigned to', 'Courtney-Heather Wheeler-Castill'\n\nWorkflow: find_change_series_and_update_dates\nDescription: Use when change records identified by a shared short description pattern must be opened one by one and have planned dates updated. Preconditions: the Change list is accessible and the series text is known. Outcome: each targeted change record has updated planned start and end dates saved.\n1. Perform navigate_to_list with <LIST_NAME>  # e.g. 'Change'\n2. Perform filter_list_single_condition using <FIELD>, <OPERATOR>, <VALUE>  # e.g. short_description LIKE '#SERIES-99e2df6c-a'\n3. For each target result, perform open_record_from_list_preview with <RECORD_ID>  # e.g. 'CHG0040314'\n4. Perform update_two_fields_on_open_record using <FIELD_LABEL_1>, <VALUE_1>, <FIELD_LABEL_2>, <VALUE_2>  # e.g. planned dates\n5. Repeat steps 3-4 for each additional change record in the series\n\n"}</script>
+<script id="page-js">
+(() => {
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const $ = (s, r = document) => r.querySelector(s);
+  const byId = id => document.getElementById(id);
+  const NS = 'http://www.w3.org/2000/svg';
+  const el = (tag, attrs = {}, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; };
+  const cssVar = n => getComputedStyle(document.body).getPropertyValue(n).trim();
+  const redrawers = [];
+
+  /* theme */
+  const root = document.documentElement;
+  try { const t = localStorage.getItem('teletune-theme'); if (t) root.dataset.theme = t; } catch (e) {}
+  byId('themeToggle').addEventListener('click', () => {
+    const dark = root.dataset.theme ? root.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+    root.dataset.theme = dark ? 'light' : 'dark';
+    try { localStorage.setItem('teletune-theme', root.dataset.theme); } catch (e) {}
+    redrawAll();
+  });
+
+  /* tooltip */
+  const tt = byId('tt');
+  const showTT = (html, x, y) => {
+    tt.innerHTML = html; tt.style.opacity = 1;
+    const w = tt.offsetWidth, h = tt.offsetHeight;
+    let left = x + 14, top = y - h - 12;
+    if (left + w > innerWidth - 8) left = x - w - 14;
+    if (top < 8) top = y + 16;
+    tt.style.left = left + 'px'; tt.style.top = top + 'px';
+  };
+  const hideTT = () => { tt.style.opacity = 0; };
+
+  /* reveal + in-view */
+  const onView = (node, fn, threshold = 0.25) => {
+    if (!node) return;
+    const io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { fn(); io.disconnect(); } }), { threshold });
+    io.observe(node);
+  };
+  const rio = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); rio.unobserve(e.target); } }), { threshold: 0.1 });
+  document.querySelectorAll('.reveal').forEach(n => rio.observe(n));
+
+  /* TOC (Article template) */
+  const toc = byId('toc');
+  if (toc) {
+    const secs = [...document.querySelectorAll('main section[id]')].filter(s => s.querySelector('h2'));
+    toc.innerHTML = '<div class="toc-h">Contents</div>' + secs.map(s => `<a href="#${s.id}" data-for="${s.id}">${s.querySelector('h2').textContent.replace(/\s+/g, ' ').trim()}</a>`).join('');
+    const tio = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) toc.querySelectorAll('a').forEach(a => a.classList.toggle('on', a.dataset.for === e.target.id)); }), { rootMargin: '-40% 0px -55% 0px' });
+    secs.forEach(s => tio.observe(s));
+  }
+
+  /* counters */
+  onView(byId('tiles'), () => {
+    document.querySelectorAll('[data-count]').forEach(n => {
+      const target = +n.dataset.count, dec = n.dataset.dec === '0' ? 0 : 1;
+      if (reduce) { n.textContent = target.toFixed(dec); return; }
+      const t0 = performance.now(), dur = 1300;
+      const tick = t => { const p = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - p, 3); n.textContent = (target * e).toFixed(dec); if (p < 1) requestAnimationFrame(tick); else n.textContent = target.toFixed(dec); };
+      requestAnimationFrame(tick);
+    });
+  });
+
+  const METHODS = ['Naive', 'Random-k', 'AWM', 'AWM + Random-k', 'TeleTune'];
+  const methodHTML = m => m === 'TeleTune' ? '<span class="sc">TeleTune</span>' : m.replace('-k', '-<i>k</i>');
+  const legendItem = (html, sym) => `<span><svg viewBox="0 0 26 12">${sym}</svg><span>${html}</span></span>`;
+  const mkSeg = (container, keys, labels, onPick, isOn) => {
+    keys.forEach((k, j) => { const b = document.createElement('button'); b.textContent = labels[j]; b.dataset.key = k; b.setAttribute('aria-pressed', isOn(k)); b.addEventListener('click', () => onPick(k)); container.appendChild(b); });
+  };
+
+  /* teacher-forcing demo */
+  if (byId('tfGrid')) {
+    const TF = { gold: ['a1', 'a2', 'a3', 'a4', 'a5'], pred: ['a1', 'a2', 'a3′', 'a4', 'a5'] };
+    const grid = byId('tfGrid'), cells = {};
+    [['Recorded action', 'gold'], ['Prediction', 'pred'], ['Appended to history', 'hist']].forEach(([label, key]) => {
+      const l = document.createElement('div'); l.className = 'tf-row-label'; l.textContent = label; grid.appendChild(l);
+      cells[key] = TF.gold.map(() => { const c = document.createElement('div'); c.className = 'tf-cell'; grid.appendChild(c); return c; });
+    });
+    let timer = null;
+    const reset = () => {
+      TF.gold.forEach((g, i) => {
+        cells.gold[i].className = 'tf-cell gold'; cells.gold[i].textContent = g;
+        cells.pred[i].className = 'tf-cell pending'; cells.pred[i].textContent = '?';
+        cells.hist[i].className = 'tf-cell pending'; cells.hist[i].textContent = '';
+      });
+      byId('tfQ').textContent = 0; byId('tfN').textContent = 0;
+    };
+    const run = () => {
+      clearTimeout(timer); reset();
+      let i = 0, hits = 0;
+      const step = () => {
+        if (i > 0) cells.gold[i - 1].classList.remove('active');
+        if (i >= TF.gold.length) { byId('tfNote').textContent = 'Skill-guided progress for this trajectory is 4/5. The error at step 3 becomes a failure case for the optimizer.'; return; }
+        cells.gold[i].classList.add('active');
+        const ok = TF.pred[i] === TF.gold[i];
+        cells.pred[i].className = 'tf-cell ' + (ok ? 'ok' : 'miss');
+        cells.pred[i].textContent = TF.pred[i] + (ok ? ' ✓' : ' ✗');
+        if (ok) hits++;
+        byId('tfQ').textContent = hits; byId('tfN').textContent = i + 1;
+        const idx = i;
+        byId('tfNote').textContent = ok ? `Step ${idx + 1}: the prediction matches the recorded action.` : `Step ${idx + 1}: a miss. We append the recorded action instead, so later steps are still scored.`;
+        setTimeout(() => { cells.hist[idx].className = 'tf-cell ' + (ok ? 'gold' : 'forced'); cells.hist[idx].textContent = TF.gold[idx]; }, reduce ? 0 : 350);
+        i++;
+        timer = setTimeout(step, reduce ? 0 : (ok ? 900 : 1700));
+      };
+      step();
+    };
+    reset();
+    byId('tfPlay').addEventListener('click', run);
+    onView(byId('tf'), run, 0.5);
+  }
+
+  /* main results */
+  if (byId('mainBars')) {
+    const MAIN = {
+      'L1': [[45.6, .6], [65.1, 2.3], [75.7, 1.7], [80.3, 1.1], [92.3, 2.0]],
+      'L2': [[48.0, 2.0], [54.2, 2.1], [51.9, 2.9], [60.4, 3.4], [61.8, 2.8]],
+      'WA Avg.': [[46.8, .9], [59.7, 2.1], [63.8, 1.8], [70.4, 1.7], [77.1, 2.1]],
+      'Easy': [[78.5, 6.0], [87.3, 7.4], [88.8, 5.4], [85.6, 4.6], [94.5, 5.3]],
+      'Medium': [[66.7, 10.8], [71.3, 1.7], [73.4, 3.9], [66.5, 12.0], [76.6, 9.7]],
+      'Hard': [[48.7, 1.2], [64.7, 9.4], [56.7, 5.8], [64.0, 5.7], [75.3, 2.8]],
+      'OM2W Avg.': [[63.9, 4.6], [72.9, 4.0], [71.9, 3.0], [70.2, 4.4], [80.6, 4.1]],
+    };
+    const LABEL = { 'L1': 'WorkArena L1', 'L2': 'WorkArena L2', 'WA Avg.': 'WorkArena Avg.', 'Easy': 'Online-Mind2Web Easy', 'Medium': 'Online-Mind2Web Medium', 'Hard': 'Online-Mind2Web Hard', 'OM2W Avg.': 'Online-Mind2Web Avg.' };
+    const colors = ['--base-0', '--base-1', '--base-2', '--base-3', '--accent'];
+    const AXMAX = 115;
+    let cur = 'WA Avg.', shown = false;
+    const refs = METHODS.map((m, i) => {
+      const row = document.createElement('div'); row.className = 'bar-row';
+      row.innerHTML = `<div class="bar-name ${i === 4 ? 'ours' : ''}">${methodHTML(m)}</div><div class="bar-track"><div class="bar-fill" style="background:var(${colors[i]})"></div><div class="bar-err"></div><div class="bar-val"></div></div>`;
+      byId('mainBars').appendChild(row);
+      const track = $('.bar-track', row);
+      track.addEventListener('mousemove', ev => { const [v, s] = MAIN[cur][i]; showTT(`<div class="tt-h">${methodHTML(m)}</div><div class="tt-r">${LABEL[cur]}<b>${v.toFixed(1)} &plusmn; ${s.toFixed(1)}</b></div>`, ev.clientX, ev.clientY); });
+      track.addEventListener('mouseleave', hideTT);
+      return { fill: $('.bar-fill', row), err: $('.bar-err', row), val: $('.bar-val', row) };
+    });
+    [0, 20, 40, 60, 80, 100].forEach(t => { const s = document.createElement('span'); s.style.left = (t / AXMAX * 100) + '%'; s.textContent = t; byId('mainTicks').appendChild(s); });
+    const render = () => MAIN[cur].forEach(([v, s], i) => {
+      const r = refs[i], sc = u => (shown ? u : 0) / AXMAX * 100;
+      r.fill.style.width = sc(v) + '%'; r.err.style.left = sc(v - s) + '%'; r.err.style.width = sc(2 * s) + '%';
+      r.val.style.left = `calc(${sc(v + s)}% + 8px)`; r.val.innerHTML = `${v.toFixed(1)}<small>&plusmn;${s.toFixed(1)}</small>`;
+    });
+    const pick = k => { cur = k; document.querySelectorAll('#mainSegA button, #mainSegB button').forEach(b => b.setAttribute('aria-pressed', b.dataset.key === cur)); render(); };
+    mkSeg(byId('mainSegA'), ['L1', 'L2', 'WA Avg.'], ['L1', 'L2', 'Avg.'], pick, k => k === cur);
+    mkSeg(byId('mainSegB'), ['Easy', 'Medium', 'Hard', 'OM2W Avg.'], ['Easy', 'Medium', 'Hard', 'Avg.'], pick, k => k === cur);
+    render();
+    onView(byId('mainBars'), () => { shown = true; render(); });
+    const cols = ['L1', 'L2', 'WA Avg.', 'Easy', 'Medium', 'Hard', 'OM2W Avg.'];
+    if (byId('mainTable')) byId('mainTable').innerHTML = METHODS.map((m, i) => `<tr class="${i === 4 ? 'ours' : ''}"><td>${methodHTML(m)}</td>${cols.map(c => `<td class="${i === 4 ? 'best' : ''}">${MAIN[c][i][0].toFixed(1)}<span class="std">&plusmn;${MAIN[c][i][1].toFixed(1)}</span></td>`).join('')}</tr>`).join('');
+  }
+
+  /* optimization chart */
+  if (byId('optChart')) {
+    const REC = [
+      [1,'w','a',+0.0233,0.4899,5,0],[2,'w','a',+0.0007,0.4907,5,0],[3,'w','r',-0.0303,0.4907,5,0],[4,'w','a',+0.0221,0.5128,5,0],
+      [5,'w','r',-0.0302,0.5128,6,0],[6,'w','r',-0.0122,0.5128,7,0],[7,'w','r',-0.0482,0.5128,4,0],[8,'w','r',-0.0040,0.5128,5,0],
+      [9,'w','r',-0.0526,0.5128,5,0],[10,'s','a',+0.1558,0.6685,5,6],[11,'s','a',+0.0150,0.6835,5,11],[12,'s','a',+0.0055,0.6891,5,17],
+      [13,'s','a',+0.0003,0.6894,5,21],[14,'s','r',-0.0014,0.6894,5,27],[15,'s','r',-0.0000,0.6894,5,25],[16,'s','r',-0.0019,0.6894,5,24],
+      [17,'s','a',+0.0023,0.6917,5,25],[18,'s','a',+0.0061,0.6978,5,31],[19,'s','r',-0.0002,0.6978,5,37],[20,'s','a',+0.0011,0.6990,5,37],
+      [21,'s','r',-0.0069,0.6990,5,43],[22,'s','a',+0.0147,0.7136,5,41],[23,'s','a',+0.0041,0.7177,5,46],[24,'s','r',-0.0006,0.7177,5,51],
+      [25,'s','a',+0.0007,0.7185,5,50],[26,'s','r',-0.0064,0.7185,5,55],[27,'s','a',+0.0119,0.7304,5,56],
+    ];
+    const SR = { 1: 74.1, 10: 83.1, 20: 88.7, 27: 92.3 };
+    let prevBest = REC[0][4] - REC[0][3], lib = { wf: 7, sk: 0 };
+    const OPT = REC.map(([step, phase, dec, delta, best, wfA, skA]) => {
+      const cand = prevBest + delta;
+      if (dec === 'a') { prevBest = best; lib = { wf: wfA, sk: skA }; }
+      return { step, phase, acc: dec === 'a', cand: cand * 100, best: best * 100, wf: lib.wf, sk: lib.sk };
+    });
+    let optStep = 27, playing = null;
+    const draw = () => {
+      const svg = byId('optChart'); svg.innerHTML = '';
+      const W = 900, H = 360, m = { l: 52, r: 18, t: 16, b: 46 };
+      const x = s => m.l + (s - 0.5) / 27 * (W - m.l - m.r);
+      const y = v => m.t + (1 - (v - 40) / 60) * (H - m.t - m.b);
+      el('rect', { x: x(0.5), y: m.t, width: x(9.5) - x(0.5), height: H - m.t - m.b, fill: cssVar('--wf-tint') }, svg);
+      el('rect', { x: x(9.5), y: m.t, width: x(27.5) - x(9.5), height: H - m.t - m.b, fill: cssVar('--sk-tint') }, svg);
+      [40, 50, 60, 70, 80, 90, 100].forEach(v => { el('line', { x1: m.l, x2: W - m.r, y1: y(v), y2: y(v), class: v === 40 ? 'baseline' : 'gridline' }, svg); el('text', { x: m.l - 8, y: y(v) + 4, 'text-anchor': 'end' }, svg).textContent = v; });
+      [1, 5, 10, 15, 20, 25, 27].forEach(s => { el('text', { x: x(s), y: H - m.b + 18, 'text-anchor': 'middle' }, svg).textContent = s; });
+      el('text', { x: (m.l + W - m.r) / 2, y: H - 8, 'text-anchor': 'middle', class: 'axis-title' }, svg).textContent = 'Optimization step';
+      el('text', { x: 14, y: (m.t + H - m.b) / 2, 'text-anchor': 'middle', class: 'axis-title', transform: `rotate(-90 14 ${(m.t + H - m.b) / 2})` }, svg).textContent = 'Rate (%)';
+      el('text', { x: x(5), y: m.t + 16, 'text-anchor': 'middle', class: 'axis-title' }, svg).textContent = 'Workflow stage';
+      el('text', { x: x(18.5), y: m.t + 16, 'text-anchor': 'middle', class: 'axis-title' }, svg).textContent = 'Skill stage';
+      el('line', { x1: x(9.5), x2: x(9.5), y1: m.t, y2: H - m.b, stroke: cssVar('--ink-3'), 'stroke-dasharray': '4 4', 'stroke-width': 1 }, svg);
+      const shown = OPT.filter(d => d.step <= optStep);
+      let p = `M${x(0.5)},${y(OPT[0].best - 2.33)}`;
+      shown.forEach(d => { p += ` H${x(d.step)} V${y(d.best)}`; });
+      p += ` H${x(Math.min(optStep + 0.5, 27.5))}`;
+      el('path', { d: p, fill: 'none', stroke: cssVar('--ink-2'), 'stroke-width': 2.2, 'stroke-linejoin': 'round' }, svg);
+      shown.forEach(d => {
+        const cx = x(d.step), cy = y(d.cand);
+        if (d.acc) el('circle', { cx, cy, r: 5, fill: cssVar('--good'), stroke: cssVar('--surface'), 'stroke-width': 2 }, svg);
+        else { const s = 4.2; el('path', { d: `M${cx - s},${cy - s} L${cx + s},${cy + s} M${cx + s},${cy - s} L${cx - s},${cy + s}`, stroke: cssVar('--bad'), 'stroke-width': 2.2, 'stroke-linecap': 'round' }, svg); }
+      });
+      const srPts = Object.entries(SR).map(([s, v]) => [+s, v]).filter(([s]) => s <= optStep);
+      if (srPts.length > 1) el('path', { d: srPts.map(([s, v], i) => `${i ? 'L' : 'M'}${x(s)},${y(v)}`).join(' '), fill: 'none', stroke: cssVar('--accent'), 'stroke-width': 2, 'stroke-dasharray': '5 4' }, svg);
+      srPts.forEach(([s, v]) => {
+        const cx = x(s), cy = y(v), r = 6.5;
+        el('path', { d: `M${cx},${cy - r} L${cx + r},${cy} L${cx},${cy + r} L${cx - r},${cy} Z`, fill: cssVar('--accent'), stroke: cssVar('--surface'), 'stroke-width': 2 }, svg);
+        el('text', { x: cx, y: cy - 12, 'text-anchor': 'middle', style: `fill:${cssVar('--accent-ink')};font-weight:600;font-size:12.5px` }, svg).textContent = v.toFixed(1);
+      });
+      const hl = el('line', { y1: m.t, y2: H - m.b, stroke: cssVar('--ink-3'), 'stroke-width': 1, opacity: 0 }, svg);
+      shown.forEach(d => {
+        const r = el('rect', { x: x(d.step - 0.5), y: m.t, width: x(1.5) - x(0.5), height: H - m.t - m.b, fill: 'transparent' }, svg);
+        r.addEventListener('mousemove', ev => {
+          hl.setAttribute('x1', x(d.step)); hl.setAttribute('x2', x(d.step)); hl.setAttribute('opacity', .5);
+          showTT(`<div class="tt-h">Step ${d.step}, ${d.phase === 'w' ? 'workflow' : 'skill'} stage</div>
+            <div class="tt-r"><span><span class="sw" style="background:${cssVar(d.acc ? '--good' : '--bad')}"></span>Candidate (${d.acc ? 'accepted' : 'rejected'})</span><b>${d.cand.toFixed(1)}</b></div>
+            <div class="tt-r"><span><span class="sw" style="background:${cssVar('--ink-2')}"></span>Best skill-guided progress</span><b>${d.best.toFixed(1)}</b></div>
+            ${SR[d.step] ? `<div class="tt-r"><span><span class="sw" style="background:${cssVar('--accent')}"></span>Live success rate</span><b>${SR[d.step].toFixed(1)}</b></div>` : ''}
+            <div class="tt-r"><span>Library</span><b>${d.wf} workflows, ${d.sk} skills</b></div>`, ev.clientX, ev.clientY);
+        });
+        r.addEventListener('mouseleave', () => { hl.setAttribute('opacity', 0); hideTT(); });
+      });
+      const d = OPT[optStep - 1], lastSR = srPts.length ? srPts[srPts.length - 1][1] : null;
+      byId('optStatus').innerHTML = `<span>Step <b>${d.step}</b> of 27</span><span>Skill-guided progress <b>${d.best.toFixed(1)}%</b></span><span>Live success rate <b>${lastSR ? lastSR.toFixed(1) + '%' : 'n/a'}</b></span><span>Library <b>${d.wf}</b> workflows, <b>${d.sk}</b> skills</span>`;
+      byId('optSlider').value = optStep;
+      byId('optLegend').innerHTML =
+        legendItem('Best skill-guided progress (dev)', `<line x1="0" x2="26" y1="6" y2="6" stroke="${cssVar('--ink-2')}" stroke-width="2.2"/>`) +
+        legendItem('Accepted candidate', `<circle cx="13" cy="6" r="5" fill="${cssVar('--good')}"/>`) +
+        legendItem('Rejected candidate', `<path d="M9,2 L17,10 M17,2 L9,10" stroke="${cssVar('--bad')}" stroke-width="2.2" stroke-linecap="round"/>`) +
+        legendItem('Live success rate (test)', `<line x1="0" x2="26" y1="6" y2="6" stroke="${cssVar('--accent')}" stroke-width="2" stroke-dasharray="5 4"/><path d="M13,0 L19,6 L13,12 L7,6 Z" fill="${cssVar('--accent')}"/>`);
+    };
+    const play = () => {
+      clearInterval(playing); optStep = 1; draw();
+      if (reduce) { optStep = 27; draw(); return; }
+      playing = setInterval(() => { optStep++; draw(); if (optStep >= 27) clearInterval(playing); }, 260);
+    };
+    byId('optPlay').addEventListener('click', play);
+    byId('optSlider').addEventListener('input', e => { clearInterval(playing); optStep = +e.target.value; draw(); });
+    draw(); redrawers.push(draw);
+    onView(byId('optChart'), play, 0.4);
+  }
+
+  /* interruption-rate small multiples */
+  if (byId('qL1')) {
+    const QS = [0, 0.33, 0.66, 1.0];
+    const QDATA = {
+      L1: { 'Random-k': [65.1, 63.9, 69.6, 75.9], 'AWM': [75.7, 74.1, 60.9, 49.3], 'AWM + Random-k': [80.3, 82.8, 70.4, 65.9], 'TeleTune': [92.3, 88.9, 83.1, 74.8], naive: 45.6 },
+      L2: { 'Random-k': [54.2, 61.6, 47.3, 48.5], 'AWM': [51.9, 52.8, 50.5, 50.0], 'AWM + Random-k': [60.4, 60.6, 53.7, 55.1], 'TeleTune': [61.8, 65.8, 63.3, 62.1], naive: 48.0 },
+    };
+    const QSTYLE = {
+      'Random-k': { c: '--base-1', dash: '6 4', mark: 'diamond' },
+      'AWM': { c: '--base-2', dash: '6 4', mark: 'square' },
+      'AWM + Random-k': { c: '--base-3', dash: '6 4', mark: 'triangle' },
+      'TeleTune': { c: '--accent', dash: '', mark: 'circle' },
+    };
+    const marker = (svg, kind, cx, cy, fill) => {
+      const s = 5, sw = { stroke: cssVar('--surface'), 'stroke-width': 1.8, fill };
+      if (kind === 'circle') return el('circle', { cx, cy, r: 5.5, ...sw }, svg);
+      if (kind === 'square') return el('rect', { x: cx - s, y: cy - s, width: 2 * s, height: 2 * s, ...sw }, svg);
+      if (kind === 'diamond') return el('path', { d: `M${cx},${cy - 6.5} L${cx + 6.5},${cy} L${cx},${cy + 6.5} L${cx - 6.5},${cy} Z`, ...sw }, svg);
+      return el('path', { d: `M${cx},${cy - 6} L${cx + 6},${cy + 5} L${cx - 6},${cy + 5} Z`, ...sw }, svg);
+    };
+    let qShown = false;
+    const drawQ = (id, key) => {
+      const svg = byId(id); svg.innerHTML = '';
+      const data = QDATA[key], W = 440, H = 280, m = { l: 40, r: 44, t: 18, b: 42 };
+      const lo = 40, hi = key === 'L1' ? 100 : 70;
+      const x = i => m.l + 14 + i / 3 * (W - m.l - m.r - 28);
+      const y = v => m.t + (1 - (v - lo) / (hi - lo)) * (H - m.t - m.b);
+      (key === 'L1' ? [40, 55, 70, 85, 100] : [40, 50, 60, 70]).forEach((v, j) => { el('line', { x1: m.l, x2: W - m.r, y1: y(v), y2: y(v), class: j === 0 ? 'baseline' : 'gridline' }, svg); el('text', { x: m.l - 8, y: y(v) + 4, 'text-anchor': 'end' }, svg).textContent = v; });
+      QS.forEach((q, i) => { el('text', { x: x(i), y: H - m.b + 18, 'text-anchor': 'middle' }, svg).textContent = q.toFixed(2); });
+      el('text', { x: (m.l + W - m.r) / 2, y: H - 6, 'text-anchor': 'middle', class: 'axis-title' }, svg).textContent = 'Interruption rate q';
+      el('line', { x1: m.l, x2: W - m.r, y1: y(data.naive), y2: y(data.naive), stroke: cssVar('--ink-3'), 'stroke-width': 1, 'stroke-dasharray': '2 3' }, svg);
+      el('text', { x: W - m.r + 4, y: y(data.naive) + 4, style: 'font-size:11px' }, svg).textContent = 'Naive';
+      const hl = el('line', { y1: m.t, y2: H - m.b, stroke: cssVar('--ink-3'), 'stroke-width': 1, opacity: 0 }, svg);
+      Object.keys(QSTYLE).forEach(name => {
+        const st = QSTYLE[name], col = cssVar(st.c), vals = data[name];
+        const path = el('path', { d: vals.map((v, i) => `${i ? 'L' : 'M'}${x(i)},${y(v)}`).join(' '), fill: 'none', stroke: col, 'stroke-width': name === 'TeleTune' ? 2.6 : 1.8, 'stroke-linejoin': 'round' }, svg);
+        if (st.dash) path.setAttribute('stroke-dasharray', st.dash);
+        if (!reduce && !qShown) {
+          if (!st.dash) { const len = path.getTotalLength(); path.style.strokeDasharray = `${len} ${len}`; path.style.strokeDashoffset = len; path.dataset.draw = 1; }
+          else { path.style.opacity = 0; path.dataset.fade = 1; }
+        }
+        vals.forEach((v, i) => { const mk = marker(svg, st.mark, x(i), y(v), col); if (!reduce && !qShown) { mk.style.opacity = 0; mk.dataset.fade = 1; } });
+      });
+      const tv = data['TeleTune'];
+      [0, 3].forEach(i => { el('text', { x: x(i), y: y(tv[i]) - 12, 'text-anchor': 'middle', style: `fill:${cssVar('--accent-ink')};font-weight:600;font-size:12.5px` }, svg).textContent = tv[i].toFixed(1); });
+      QS.forEach((q, i) => {
+        const r = el('rect', { x: x(i) - 40, y: m.t, width: 80, height: H - m.t - m.b, fill: 'transparent' }, svg);
+        r.addEventListener('mousemove', ev => {
+          hl.setAttribute('x1', x(i)); hl.setAttribute('x2', x(i)); hl.setAttribute('opacity', .5);
+          const rows = Object.keys(QSTYLE).map(n => ({ n, v: data[n][i] })).sort((a, b) => b.v - a.v).map(({ n, v }) => `<div class="tt-r"><span><span class="sw" style="background:${cssVar(QSTYLE[n].c)}"></span>${methodHTML(n)}</span><b>${v.toFixed(1)}</b></div>`).join('');
+          showTT(`<div class="tt-h">WorkArena ${key}, q = ${q.toFixed(2)}</div>${rows}<div class="tt-r"><span>Naive</span><b>${data.naive.toFixed(1)}</b></div>`, ev.clientX, ev.clientY);
+        });
+        r.addEventListener('mouseleave', () => { hl.setAttribute('opacity', 0); hideTT(); });
+      });
+    };
+    const drawLegend = () => {
+      const sym = n => {
+        const st = QSTYLE[n], c = cssVar(st.c);
+        const mk = { circle: `<circle cx="13" cy="6" r="4.5" fill="${c}"/>`, square: `<rect x="9" y="2" width="8" height="8" fill="${c}"/>`, diamond: `<path d="M13,1 L18,6 L13,11 L8,6 Z" fill="${c}"/>`, triangle: `<path d="M13,1 L18,10 L8,10 Z" fill="${c}"/>` }[st.mark];
+        return `<line x1="0" x2="26" y1="6" y2="6" stroke="${c}" stroke-width="2" ${st.dash ? `stroke-dasharray="${st.dash}"` : ''}/>` + mk;
+      };
+      byId('qLegend').innerHTML = Object.keys(QSTYLE).map(n => legendItem(methodHTML(n), sym(n))).join('') + legendItem('Naive (no training pool)', `<line x1="0" x2="26" y1="6" y2="6" stroke="${cssVar('--ink-3')}" stroke-width="1" stroke-dasharray="2 3"/>`);
+    };
+    const drawAllQ = () => { drawQ('qL1', 'L1'); drawQ('qL2', 'L2'); drawLegend(); };
+    drawAllQ(); redrawers.push(drawAllQ);
+    onView(byId('qL1'), () => {
+      qShown = true;
+      document.querySelectorAll('#qL1 [data-draw], #qL2 [data-draw]').forEach(n => { n.style.transition = 'stroke-dashoffset 1.4s cubic-bezier(.3,.7,.2,1)'; n.style.strokeDashoffset = 0; });
+      document.querySelectorAll('#qL1 [data-fade], #qL2 [data-fade]').forEach(n => { n.style.transition = 'opacity .9s ease'; n.style.opacity = 1; });
+    }, 0.4);
+  }
+
+  /* ablation */
+  if (byId('ablGrid')) {
+    const ABL = { L1: [65.1, 66.8, 83.7, 92.3], L2: [54.2, 52.6, 60.8, 61.8], OM2W: [72.9, 74.3, 75.1, 80.6] };
+    let key = 'L1', shown = false;
+    const fmt = v => (v >= 0 ? '+' : '−') + Math.abs(v).toFixed(1);
+    const draw = () => {
+      const [none, ret, opt, full] = ABL[key];
+      byId('ablGrid').innerHTML = `
+        <div></div><div class="hd">Random retrieval</div><div class="hd">Workflow-based retrieval</div>
+        <div class="rh">No skill optimization</div>
+        <div class="cell"><div class="v">${none.toFixed(1)}</div><div class="d">Random-<i>k</i> baseline</div></div>
+        <div class="cell" style="--c:var(--ms-green)"><div class="v">${ret.toFixed(1)}</div><div class="d">${fmt(ret - none)}</div></div>
+        <div class="rh">Skill optimization</div>
+        <div class="cell" style="--c:var(--ms-yellow)"><div class="v">${opt.toFixed(1)}</div><div class="d">${fmt(opt - none)}</div></div>
+        <div class="cell full" style="--c:var(--accent)"><div class="v">${full.toFixed(1)}</div><div class="d">${fmt(full - none)}, full <span class="sc">TeleTune</span></div></div>`;
+      const gO = opt - none, gR = ret - none, gF = full - none, extra = gF - (gO + gR);
+      byId('synergy').innerHTML = `
+        <div class="syn-row"><span>Sum of individual gains</span><div class="syn-track"><div class="syn-seg" style="background:var(--ms-yellow)" data-w="${gO}"></div><div class="syn-seg" style="background:var(--ms-green)" data-w="${gR}"></div><span class="syn-val">${fmt(gO)} ${gR >= 0 ? '+' : '−'} ${Math.abs(gR).toFixed(1)} = ${fmt(gO + gR)}</span></div></div>
+        <div class="syn-row"><span>Both components together</span><div class="syn-track"><div class="syn-seg" style="background:var(--accent)" data-w="${gF}"></div><span class="syn-val">${fmt(gF)} (${fmt(extra)} beyond the sum)</span></div></div>
+        <div class="legend" style="margin-top:2px">${legendItem('Skill optimization alone', '<rect x="0" y="2" width="26" height="8" fill="var(--ms-yellow)"/>')}${legendItem('Workflow-based retrieval alone', '<rect x="0" y="2" width="26" height="8" fill="var(--ms-green)"/>')}${legendItem('Full <span class="sc">TeleTune</span>', '<rect x="0" y="2" width="26" height="8" fill="var(--accent)"/>')}</div>`;
+      requestAnimationFrame(() => document.querySelectorAll('#synergy .syn-seg').forEach(s => { s.style.width = (shown ? Math.max(0, +s.dataset.w) / 40 * 100 : 0) + '%'; }));
+    };
+    mkSeg(byId('ablSeg'), ['L1', 'L2', 'OM2W'], ['WorkArena L1', 'WorkArena L2', 'Online-Mind2Web'], k => { key = k; document.querySelectorAll('#ablSeg button').forEach(b => b.setAttribute('aria-pressed', b.dataset.key === k)); draw(); }, k => k === key);
+    draw();
+    onView(byId('ablGrid'), () => { shown = true; draw(); }, 0.4);
+  }
+
+  /* cost */
+  if (byId('costBars')) {
+    // Optimization tokens (M) from the paper; live validation = the reported multiple of our total.
+    const COST = [{ name: 'WorkArena L1', ours: 173.84, ratio: 16 }, { name: 'WorkArena L2', ours: 23.59, ratio: 75 }, { name: 'Mind2Web', ours: 330.15, ratio: 5 }];
+    const maxC = Math.max(...COST.map(c => c.ours * c.ratio));
+    let shown = false;
+    const fmtTok = m => m >= 1000 ? `≈${(m / 1000).toFixed(1)}B` : `${m.toFixed(1)}M`;
+    const draw = () => {
+      byId('costBars').innerHTML = COST.map(c => `
+        <div>
+          <div class="cost-h"><span>${c.name}</span><span class="ratio">${c.ratio}&times; fewer tokens</span></div>
+          <div class="cost-bar"><span><span class="sc">TeleTune</span></span><div><div class="cost-fill" style="background:var(--accent)" data-w="${c.ours / maxC * 100}"><span>${fmtTok(c.ours)}</span></div></div></div>
+          <div class="cost-bar"><span>Live validation</span><div><div class="cost-fill" style="background:var(--base-2)" data-w="${c.ours * c.ratio / maxC * 80}"><span>${fmtTok(c.ours * c.ratio)}</span></div></div></div>
+        </div>`).join('');
+      requestAnimationFrame(() => document.querySelectorAll('.cost-fill').forEach(f => { f.style.width = (shown ? Math.max(+f.dataset.w, 0.6) : 0) + '%'; }));
+    };
+    draw();
+    onView(byId('costBars'), () => { shown = true; draw(); }, 0.4);
+  }
+
+  /* learned library browser */
+  if (byId('libList') && byId('libJSON')) {
+    const RAW = JSON.parse(byId('libJSON').textContent);
+    const MODELS = [['gpt', 'GPT-5.4'], ['qwen', 'Qwen-3.6'], ['mistral', 'Mistral-3.5']];
+    const BENCHES = [['l1', 'WorkArena L1'], ['l2', 'WorkArena L2'], ['m2w', 'Mind2Web']];
+    const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const parse = text => {
+      const [skillPart, wfPart = ''] = text.split(/^### Workflows\s*$/m);
+      const skills = [];
+      skillPart.replace(/^### Skill\s*$/m, '').split('\n').forEach(line => {
+        const m = line.match(/^(\d+)\.\s+(.*)$/);
+        if (m) skills.push({ n: m[1], text: m[2] });
+        else if (line.trim() && skills.length) skills[skills.length - 1].text += ' ' + line.trim();
+      });
+      skills.forEach(s => {
+        const i = s.text.indexOf(' Example:');
+        s.rule = i >= 0 ? s.text.slice(0, i) : s.text;
+        s.example = i >= 0 ? s.text.slice(i + 9).trim() : '';
+        const m = s.example.match(/^for goal '([\s\S]*?)', after ([\s\S]*?), the correct next action is ([\s\S]*?)(?: \(not ([\s\S]*)\))?\.?\s*$/);
+        if (m) s.ex = { goal: m[1], after: m[2], gold: m[3], not: m[4] };
+      });
+      const workflows = [];
+      wfPart.split(/^(?=Workflow:)/m).forEach(block => {
+        const lines = block.split('\n');
+        if (!/^Workflow:/.test(lines[0] || '')) return;
+        const wf = { name: lines[0].replace(/^Workflow:\s*/, '').trim(), desc: '', steps: [], extra: [] };
+        lines.slice(1).forEach(l => {
+          if (/^Description:/.test(l)) wf.desc = l.replace(/^Description:\s*/, '');
+          else if (/^\d+\.\s/.test(l)) wf.steps.push({ text: l.replace(/^\d+\.\s+/, ''), subs: [] });
+          else if (/^\s+\S/.test(l) && wf.steps.length) wf.steps[wf.steps.length - 1].subs.push(l.trim().replace(/^-\s+/, ''));
+          else if (l.trim()) wf.extra.push(l.trim());
+        });
+        workflows.push(wf);
+      });
+      return { skills, workflows };
+    };
+    const LIBS = {};
+    Object.keys(RAW).forEach(k => { LIBS[k] = parse(RAW[k]); });
+    let model = 'gpt', bench = 'l1', tab = 'skills', query = '';
+    const has = (m, b) => !!LIBS[`${m}|${b}`];
+    const hl = s => {
+      const e = esc(s);
+      if (!query) return e;
+      const q = esc(query).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      return e.replace(new RegExp(q, 'gi'), x => `<mark>${x}</mark>`);
+    };
+    const splitComment = s => { const m = s.match(/^(.*?)(\s+#\s[\s\S]*)$/); return m ? `${hl(m[1])}<span class="c">${hl(m[2])}</span>` : hl(s); };
+    const renderSkill = s => `<div class="sk"><div class="sk-n">${s.n}</div><div>
+        <p class="sk-rule">${hl(s.rule)}</p>
+        ${s.ex ? `<div class="sk-ex"><span>Goal</span><div>${hl(s.ex.goal)}</div><span>After</span><div><code>${hl(s.ex.after)}</code></div><span>Correct</span><div><code class="good">✓ ${hl(s.ex.gold)}</code></div>${s.ex.not ? `<span>Not</span><div><code class="bad">✗ ${hl(s.ex.not)}</code></div>` : ''}</div>`
+          : s.example ? `<div class="sk-ex"><span>Example</span><div>${hl(s.example)}</div></div>` : ''}
+      </div></div>`;
+    const renderWf = w => `<div class="wf"><div class="wf-name">${hl(w.name)}</div>${w.desc ? `<p class="wf-desc">${hl(w.desc)}</p>` : ''}
+        ${w.steps.length ? `<ol>${w.steps.map(s => `<li>${splitComment(s.text)}${s.subs.length ? `<ul class="wf-sub">${s.subs.map(x => `<li>${splitComment(x)}</li>`).join('')}</ul>` : ''}</li>`).join('')}</ol>` : ''}
+        ${w.extra.length ? `<div class="x">${w.extra.map(hl).join('\n')}</div>` : ''}</div>`;
+    const match = (obj) => !query || JSON.stringify(obj).toLowerCase().includes(query.toLowerCase());
+    const drawControls = () => {
+      byId('libModel').innerHTML = MODELS.map(([k, l]) => `<button type="button" data-k="${k}" aria-pressed="${k === model}">${l}</button>`).join('');
+      byId('libBench').innerHTML = BENCHES.map(([k, l]) => `<button type="button" data-k="${k}" aria-pressed="${k === bench}" ${has(model, k) ? '' : `disabled title="Not learned for this backbone"`}>${l}</button>`).join('');
+      const lib = LIBS[`${model}|${bench}`];
+      byId('libTabs').innerHTML = [['skills', `Skills (${lib.skills.length})`], ['workflows', `Workflows (${lib.workflows.length})`]]
+        .map(([k, l]) => `<button type="button" data-k="${k}" aria-pressed="${k === tab}">${l}</button>`).join('');
+    };
+    const drawList = () => {
+      const lib = LIBS[`${model}|${bench}`];
+      const items = tab === 'skills' ? lib.skills : lib.workflows;
+      const shown = items.filter(it => tab === 'skills' ? match(it.rule) : match(it));
+      byId('libCount').textContent = query ? `${shown.length} of ${items.length} ${tab}` : `${items.length} ${tab}`;
+      byId('libList').innerHTML = !shown.length ? `<div class="lib-empty">No ${tab} match “${esc(query)}”.</div>`
+        : tab === 'skills' ? `<ol class="sk-list">${shown.map(s => `<li value="${s.n}">${hl(s.rule)}</li>`).join('')}</ol>` : shown.map(renderWf).join('');
+      byId('libList').scrollTop = 0;
+    };
+    const draw = () => { drawControls(); drawList(); };
+    byId('libModel').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; model = b.dataset.k; if (!has(model, bench)) bench = 'l1'; draw(); });
+    byId('libBench').addEventListener('click', e => { const b = e.target.closest('button'); if (!b || b.disabled) return; bench = b.dataset.k; draw(); });
+    byId('libTabs').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; tab = b.dataset.k; draw(); });
+    byId('libSearch').addEventListener('input', e => { query = e.target.value.trim(); drawList(); });
+    draw();
+  }
+
+  if (byId('copyBib')) byId('copyBib').addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText(byId('bibtex').textContent); byId('copyBib').textContent = 'Copied'; setTimeout(() => byId('copyBib').textContent = 'Copy', 1500); } catch (e) {}
+  });
+
+  /* reflect, edit, validate loop */
+  if (byId('revLoop')) {
+    const ITERS = [
+      { goal: 'Find hardware assets with install status Missing and unassigned.', hist: "\u2026 select_option('nth=1', '=')",
+        pred: "select_option('nth=1', 'Unassigned')", gold: "click('Run')",
+        op: 'add', edit: "After setting all filter conditions, always click 'Run' to apply the filter.", ok: true, cand: 66.9 },
+      { goal: 'Sort hardware asset records by Assigned in ascending order and by PO number in ascending order.', hist: "\u2026 select_option('nth=2', 'ascending')",
+        pred: "click('Run')", gold: "click('Run filter')",
+        op: 'replace', edit: "After any list condition, click 'Run filter' instead of 'Run'.", short: "Replace skill 1 with \u201cclick 'Run filter' instead of 'Run'\u201d", ok: false, cand: 66.2 },
+      { goal: 'Sort hardware asset records by Assigned in ascending order and by PO number in ascending order.', hist: "\u2026 select_option('nth=2', 'ascending')",
+        pred: "click('Run')", gold: "click('Run filter')",
+        op: 'add', edit: "After setting all sort conditions, click 'Run filter' (not 'Run').", ok: true, cand: 68.1 },
+      { goal: "Search for knowledge information about the company's stock ticker symbol.", hist: '(no prior actions)',
+        pred: 'click("nth=0")', gold: 'fill("Search", "\\"company\'s stock ticker symbol\\"")',
+        op: 'add', edit: "For knowledge base searches, begin by filling the 'Search' field with the query in quotes.", ok: true, cand: 68.9 },
+      { goal: 'Create a change request with low impact, moderate risk, category Other, and close code Successful with issues.', hist: '(no prior actions)',
+        pred: "click('Justification')", gold: 'select_option("Impact", "3 - Low")',
+        op: 'add', edit: 'In create forms, set every choice field before any text field.', short: 'Add \u201cset every choice field before any text field\u201d', ok: false, cand: 68.6 },
+      { goal: 'Create a change request with low impact, moderate risk, category Other, and close code Successful with issues.', hist: '(no prior actions)',
+        pred: "click('Justification')", gold: 'select_option("Impact", "3 - Low")',
+        op: 'add', edit: 'In create forms, prioritize populating required fields (e.g., Impact, Risk) before optional fields (e.g., Justification).', ok: true, cand: 69.4 },
+    ];
+    const Q0 = 51.3, WF = 5;
+    const STAGES = [
+      { name: 'Reflect', ang: -90, c: '--ms-red', n: 1, lab: [0, -44] },
+      { name: 'Edit', ang: 30, c: '--ms-yellow', n: 2, lab: [0, 46] },
+      { name: 'Validate', ang: 150, c: '--ms-green', n: 3, lab: [0, 46] },
+    ];
+    const svg = byId('rlSvg'), CX = 150, R = 108, GAP = 21;
+    const rad = a => a * Math.PI / 180;
+    const pt = (a, r = R) => [CX + r * Math.cos(rad(a)), CX + r * Math.sin(rad(a))];
+    const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    svg.innerHTML = `<defs>
+      <marker id="rlArr" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--ink-3)"/></marker>
+      <marker id="rlArrRed" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--bad)"/></marker></defs>`;
+    const arcs = STAGES.map((s, i) => {
+      const a0 = s.ang + GAP, a1 = STAGES[(i + 1) % 3].ang + (i === 2 ? 360 : 0) - GAP;
+      const [x0, y0] = pt(a0), [x1, y1] = pt(a1);
+      return { a0, a1, el: el('path', { d: `M${x0},${y0} A${R},${R} 0 0 1 ${x1},${y1}`, fill: 'none', class: 'rl-arc', 'marker-end': 'url(#rlArr)', style: 'stroke:var(--line);stroke-width:2' }, svg) };
+    });
+    const [vx, vy] = pt(150), [ex, ey] = pt(30);
+    const chord = el('path', { d: `M${vx + 18},${vy + 14} Q150,${vy + 62} ${ex - 18},${ey + 14}`, fill: 'none', 'marker-end': 'url(#rlArrRed)', style: 'stroke:var(--bad);stroke-width:2;stroke-dasharray:5 4;opacity:0' }, svg);
+    const chordLbl = el('text', { x: 150, y: vy + 14, 'text-anchor': 'middle', style: 'fill:var(--bad);font-size:11px;opacity:0' }, svg);
+    chordLbl.textContent = 'rejected edit fed back';
+    const lib = el('g', { class: 'rl-lib' }, svg);
+    el('circle', { cx: CX, cy: CX, r: 52, style: 'fill:var(--surface-2);stroke:var(--line);stroke-width:1' }, lib);
+    const libT = [['Library', 126, 'fill:var(--ink-3);font-size:12px'], ['', 146, 'fill:var(--ink-2);font-size:13px'], ['', 166, 'fill:var(--ink);font-size:15px;font-weight:700'], ['', 185, 'fill:var(--accent-ink);font-size:12px;font-weight:600']]
+      .map(([t, y, st]) => { const n = el('text', { x: CX, y, 'text-anchor': 'middle', style: st }, lib); n.textContent = t; return n; });
+    const nodes = STAGES.map(s => {
+      const [x, y] = pt(s.ang), g = el('g', { class: 'rl-node' }, svg);
+      const c = el('circle', { cx: x, cy: y, r: 24, style: `fill:var(--surface);stroke:var(${s.c});stroke-width:2.5` }, g);
+      el('text', { x, y: y + 5, 'text-anchor': 'middle', style: 'fill:var(--ink);font-size:14px;font-weight:700' }, g).textContent = s.n;
+      el('text', { x: x + s.lab[0], y: y + s.lab[1], 'text-anchor': 'middle', style: 'fill:var(--ink);font-size:13px;font-weight:600' }, g).textContent = s.name;
+      return { g, c };
+    });
+    const token = el('circle', { r: 6.5, style: 'fill:var(--accent);opacity:0' }, svg);
+
+    let st = { skills: 0, q: Q0, rejected: [], verdicts: [] };
+    let gen = 0, playing = !reduce, visible = false, started = false;
+    const sleep = (ms, g) => new Promise(res => {
+      let left = ms, last = performance.now();
+      const tick = () => {
+        if (g !== gen) return res(false);
+        const now = performance.now();
+        if (playing && visible) left -= now - last;
+        last = now;
+        if (left <= 0) return res(true);
+        setTimeout(tick, 50);
+      };
+      tick();
+    });
+    const animate = (dur, fn, g) => new Promise(res => {
+      if (reduce) { fn(1); return res(g === gen); }
+      const t0 = performance.now();
+      const f = () => { if (g !== gen) return res(false); const p = Math.min(1, (performance.now() - t0) / dur); fn(p < .5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2); if (p < 1) setTimeout(f, 16); else res(true); };
+      f();
+    });
+    const renderLib = () => {
+      libT[1].textContent = `${WF} workflows`;
+      libT[2].textContent = `${st.skills} skill${st.skills === 1 ? '' : 's'}`;
+      libT[3].textContent = `dev Q ${st.q.toFixed(1)}`;
+    };
+    const setActive = k => {
+      nodes.forEach((n, i) => { n.g.classList.toggle('on', i === k); n.c.style.fill = i === k ? `color-mix(in srgb, var(${STAGES[i].c}) 22%, var(--surface))` : 'var(--surface)'; });
+      const s = STAGES[k];
+      byId('rlStage').innerHTML = `<span class="sq" style="background:var(${s.c})"></span>${s.name}`;
+    };
+    const renderTimeline = cur => {
+      byId('rlTimeline').innerHTML = '<span class="lbl">Step</span>' + ITERS.map((_, i) => {
+        const v = st.verdicts[i];
+        return `<button type="button" class="rl-dot ${v === true ? 'acc' : v === false ? 'rej' : ''} ${i === cur ? 'cur' : ''}" data-i="${i}" aria-label="Jump to step ${i + 1}">${i + 1}</button>`;
+      }).join('');
+    };
+    const travel = async (k, g) => {
+      const a = arcs[k];
+      arcs.forEach((x, i) => { x.el.style.stroke = i === k ? 'var(--ink-2)' : 'var(--line)'; });
+      token.style.opacity = 1;
+      const ok = await animate(reduce ? 0 : 800, p => { const [x, y] = pt(a.a0 + (a.a1 - a.a0) * p); token.setAttribute('cx', x); token.setAttribute('cy', y); }, g);
+      token.style.opacity = 0; a.el.style.stroke = 'var(--line)';
+      return ok;
+    };
+    const typeInto = (node, text, g) => new Promise(res => {
+      if (reduce) { node.textContent = text; return res(true); }
+      let shown = 0, last = performance.now();
+      const tick = () => {
+        if (g !== gen) return res(false);
+        const now = performance.now();
+        if (playing && visible) shown = Math.min(text.length, shown + (now - last) * 0.05);
+        last = now;
+        const n = Math.floor(shown);
+        node.innerHTML = esc(text.slice(0, n)) + (n < text.length ? '<span class="rl-caret"></span>' : '');
+        if (n >= text.length) return res(true);
+        setTimeout(tick, 30);
+      };
+      tick();
+    });
+    const showReflect = it => {
+      byId('rlBody').innerHTML = `<p class="rl-title">We replay a train-split trajectory and take its first prediction error.</p>
+        <div class="rl-kv" style="--d:.1s"><span>Inferred goal</span><div>${esc(it.goal)}</div></div>
+        <div class="rl-kv" style="--d:.35s"><span>History</span><div class="rl-code">${esc(it.hist)}</div></div>
+        <div class="rl-kv" style="--d:.8s"><span>Predicted</span><div class="rl-code rl-bad">\u2717 ${esc(it.pred)}</div></div>
+        <div class="rl-kv" style="--d:1.3s"><span>Recorded</span><div class="rl-code rl-good">\u2713 ${esc(it.gold)}</div></div>`;
+    };
+    const showEdit = it => {
+      byId('rlBody').innerHTML = `<p class="rl-title">The optimizer reads the failure and the current library, then proposes an edit.</p>
+        <div class="rl-diff ${it.op}"><span class="rl-op">${it.op === 'add' ? '+ Add skill' : '~ Replace skill 1'}</span><span id="rlType"></span></div>
+        ${st.rejected.length ? `<div class="rl-rej" style="--d:.2s">Previously rejected edits in its input${st.rejected.map(r => `<s>${esc(r)}</s>`).join('')}</div>` : ''}`;
+      return byId('rlType');
+    };
+    const showValidate = it => {
+      const w = v => Math.max(0, Math.min(100, (v - 40) / 40 * 100));
+      byId('rlBody').innerHTML = `<p class="rl-title">We score the current and candidate libraries on the dev split.</p>
+        <div class="rl-bars">
+          <div class="rl-bar-row"><span>Current library</span><div class="rl-track"><div class="rl-fill" style="background:var(--base-2)" data-w="${w(st.q)}"></div></div><span class="rl-val">${st.q.toFixed(1)}</span></div>
+          <div class="rl-bar-row"><span>Candidate library</span><div class="rl-track"><div class="rl-fill" style="background:var(--accent)" data-w="${w(it.cand)}"></div></div><span class="rl-val">${it.cand.toFixed(1)}</span></div>
+        </div><div id="rlVerdict"></div>`;
+      requestAnimationFrame(() => requestAnimationFrame(() => byId('rlBody').querySelectorAll('.rl-fill').forEach(f => { f.style.width = f.dataset.w + '%'; })));
+    };
+    const stateBefore = idx => {
+      const s = { skills: 0, q: Q0, rejected: [], verdicts: [] };
+      ITERS.slice(0, idx).forEach(it => { s.verdicts.push(it.ok); if (it.ok) { s.skills++; s.q = it.cand; } else s.rejected.push(it.short); });
+      return s;
+    };
+    const run = async start => {
+      const g = ++gen;
+      let i = start;
+      st = stateBefore(i);
+      while (g === gen) {
+        const it = ITERS[i];
+        renderLib(); renderTimeline(i);
+        byId('rlStep').textContent = `Step ${i + 1} of ${ITERS.length}`;
+        chord.style.opacity = 0; chordLbl.style.opacity = 0;
+        setActive(0); showReflect(it);
+        if (!(await sleep(3400, g))) return;
+        if (!(await travel(0, g))) return;
+        setActive(1);
+        const typer = showEdit(it);
+        if (!(await sleep(300, g))) return;
+        if (!(await typeInto(typer, it.edit, g))) return;
+        if (!(await sleep(1500, g))) return;
+        if (!(await travel(1, g))) return;
+        setActive(2); showValidate(it);
+        if (!(await sleep(1300, g))) return;
+        byId('rlVerdict').outerHTML = it.ok
+          ? `<div class="rl-verdict acc"><b>\u2713 Accepted</b><span>The candidate scores higher, so it becomes the current library.</span></div>`
+          : `<div class="rl-verdict rej"><b>\u2717 Rejected</b><span>We keep the current library and pass the edit back to the optimizer.</span></div>`;
+        st.verdicts[i] = it.ok; renderTimeline(i);
+        if (it.ok) {
+          st.skills++; st.q = it.cand; renderLib();
+          lib.classList.remove('pulse'); void lib.getBBox(); lib.classList.add('pulse');
+        } else {
+          st.rejected.push(it.short);
+          const len = chord.getTotalLength();
+          chord.style.strokeDasharray = `${len} ${len}`; chord.style.strokeDashoffset = len; chord.style.opacity = 1; chordLbl.style.opacity = 1;
+          if (!(await animate(reduce ? 0 : 900, p => { chord.style.strokeDashoffset = len * (1 - p); }, g))) return;
+          chord.style.strokeDasharray = '5 4'; chord.style.strokeDashoffset = 0;
+        }
+        if (!(await sleep(2400, g))) return;
+        if (!(await travel(2, g))) return;
+        i = (i + 1) % ITERS.length;
+        if (i === 0) { st = stateBefore(0); }
+      }
+    };
+    const playIcon = () => { byId('rlPlay').innerHTML = playing ? '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>' : '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4v16l13-8z"/></svg>'; byId('rlPlay').setAttribute('aria-label', playing ? 'Pause the loop' : 'Play the loop'); };
+    byId('rlPlay').addEventListener('click', () => { playing = !playing; playIcon(); });
+    byId('rlTimeline').addEventListener('click', e => { const b = e.target.closest('.rl-dot'); if (b) run(+b.dataset.i); });
+    playIcon();
+    new IntersectionObserver(es => es.forEach(e => { visible = e.isIntersecting; if (visible && !started) { started = true; run(0); } }), { threshold: 0.3 }).observe(byId('revLoop'));
+    st = stateBefore(0); renderLib(); renderTimeline(0); setActive(0); showReflect(ITERS[0]);
+    byId('rlStep').textContent = `Step 1 of ${ITERS.length}`;
+  }
+
+  function redrawAll() { redrawers.forEach(f => f()); }
+  window.__pageRedraw = redrawAll;
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', redrawAll);
+})();
+</script>
+
+<!-- ======================== editor (removed on export) ======================== -->
+
+</body></html>
